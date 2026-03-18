@@ -10,18 +10,12 @@
 </p>
 
 ---
-The concept is, in the whole, a version control system + network for exploring projects for designers to manage, store and publish projects. The main idea is to provide designers with a visually appealing interface of a system to contain their projects securely, neatly and comfortably. 
+The concept is, in the whole, a version control system & a network for exploring projects for designers to manage, store and publish projects. The main idea is to provide designers with a visually appealing interface of a system to contain their projects securely, neatly and comfortably. 
 
 ---
 
-Spring Boot backend (Java)
+## Changelog
 
-In addition to the original Django REST Framework backend, a minimal Spring Boot backend is provided to serve the same authentication endpoint for migration purposes.
-
-How to run the Spring Boot backend:
-- Prerequisites: Java 21+ and Maven 3.9+
-- Navigate to overseer-backend-spring
-- Run: mvn spring-boot:run
-
-Endpoint parity:
-- GET http://localhost:8080/api/auth returns { "message": "Authentication endpoint is working!" }
+| Version | Date       | Changes                                                                                                                                                                                                                                                                  |
+|---------|------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 0.1.0   | 2026-03-18 | Spring Boot backend (Java 21) with Google OAuth2 + JWT auth, REST endpoints for users/projects/sheets/files, PostgreSQL via JPA, Swagger UI with Bearer token support, Docker Compose with PostgreSQL service, React + Vite frontend scaffold, Electron desktop scaffold |
