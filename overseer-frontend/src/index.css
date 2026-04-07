@@ -1,68 +1,110 @@
+@import "tailwindcss";
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --c-blue:   #60a5fa;
+  --c-violet: #a78bfa;
+  --c-pink:   #f472b6;
+  --c-green:  #34d399;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+* {
+  box-sizing: border-box;
 }
-a:hover {
-  color: #535bf2;
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgba(96, 165, 250, 0.25);
+  color: #fff;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Flowing gradient animation */
+@keyframes gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.text-gradient-flow {
+  background: linear-gradient(
+    135deg,
+    #60a5fa 0%,
+    #a78bfa 18%,
+    #f472b6 36%,
+    #fb923c 50%,
+    #34d399 64%,
+    #a78bfa 82%,
+    #60a5fa 100%
+  );
+  background-size: 300%;
+  animation: gradient-shift 7s ease-in-out infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Marquee */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.marquee-track {
   display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  width: max-content;
+  animation: marquee 30s linear infinite;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+.marquee-track:hover {
+  animation-play-state: paused;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
+/* Primary button */
+.btn-primary {
+  background: linear-gradient(135deg, var(--c-blue) 0%, var(--c-violet) 100%);
+  color: white;
+  transition: opacity 150ms ease, box-shadow 150ms ease;
 }
-button:hover {
-  border-color: #646cff;
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.88;
+  box-shadow: 0 4px 24px rgba(96, 165, 250, 0.28);
 }
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+/* Avatar fallback gradient */
+.avatar-gradient {
+  background: linear-gradient(135deg, var(--c-blue) 0%, var(--c-violet) 100%);
 }
+
+/* Card color glows on hover */
+n.card-glow-blue:hover   { box-shadow: 0 8px 48px rgba( 96, 165, 250, 0.18), 0 1px 3px rgba(0,0,0,0.4); border-color: rgba( 96, 165, 250, 0.4) !important; }
+.card-glow-violet:hover { box-shadow: 0 8px 48px rgba(167, 139, 250, 0.18), 0 1px 3px rgba(0,0,0,0.4); border-color: rgba(167, 139, 250, 0.4) !important; }
+.card-glow-pink:hover   { box-shadow: 0 8px 48px rgba(244, 114, 182, 0.18), 0 1px 3px rgba(0,0,0,0.4); border-color: rgba(244, 114, 182, 0.4) !important; }
+.card-glow-green:hover  { box-shadow: 0 8px 48px rgba( 52, 211, 153, 0.18), 0 1px 3px rgba(0,0,0,0.4); border-color: rgba( 52, 211, 153, 0.4) !important; }
