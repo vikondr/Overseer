@@ -20,7 +20,7 @@ export default function Navbar() {
     <Link
       to={to}
       className={`text-sm transition-colors ${
-        location.pathname === to
+        location.pathname === to || location.pathname.startsWith(to + '/')
           ? 'text-white'
           : 'text-slate-400 hover:text-white'
       }`}
@@ -43,7 +43,7 @@ export default function Navbar() {
         {/* Nav links */}
         <div className="flex items-center gap-5">
           {navLink('/explore', 'Explore')}
-          {user && navLink('/dashboard', 'Dashboard')}
+          {user && navLink(`/u/${user.username}`, 'My Profile')}
         </div>
 
         {/* Right side */}

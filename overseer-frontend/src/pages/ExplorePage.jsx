@@ -3,8 +3,8 @@ import { exploreProjects, searchProjects } from '../api/projects';
 import ProjectCard from '../components/ProjectCard';
 
 const SORTS = [
-  { value: 'stars', label: 'Most starred' },
-  { value: 'recent', label: 'Recently updated' },
+  { value: 'stars', label: 'Most starred', color: '#60a5fa' },
+  { value: 'recent', label: 'Recently updated', color: '#a78bfa' },
 ];
 
 export default function ExplorePage() {
@@ -54,8 +54,17 @@ export default function ExplorePage() {
   return (
     <div className="min-h-screen bg-slate-950 pt-14">
       {/* Header */}
-      <div className="border-b border-slate-800/60 bg-slate-950/80 backdrop-blur-sm px-4 py-10">
-        <div className="max-w-5xl mx-auto">
+      <div className="relative border-b border-slate-800/60 overflow-hidden px-4 py-10"
+        style={{ background: 'linear-gradient(180deg, rgba(96,165,250,0.04) 0%, transparent 100%)' }}
+      >
+        {/* Subtle blob */}
+        <div className="absolute pointer-events-none top-0 right-0 w-96 h-40"
+          style={{ background: 'radial-gradient(ellipse at 100% 0%, rgba(167,139,250,0.08) 0%, transparent 70%)' }} />
+
+        <div className="relative max-w-5xl mx-auto">
+          <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: '#60a5fa' }}>
+            Community
+          </p>
           <h1 className="text-3xl font-bold text-white mb-1">Explore</h1>
           <p className="text-slate-500 text-sm mb-6">Discover creative work from the community</p>
 
@@ -74,8 +83,8 @@ export default function ExplorePage() {
                 type="text"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search projects..."
-                className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-700 text-white placeholder-slate-600 rounded-xl focus:outline-none focus:border-blue-500 text-sm transition-colors"
+                placeholder="Search projects…"
+                className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-700 text-white placeholder-slate-600 rounded-xl focus:outline-none focus:border-blue-400 text-sm transition-colors"
               />
             </div>
             <button
@@ -116,11 +125,15 @@ export default function ExplorePage() {
                     setSort(s.value);
                     setPage(0);
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    sort === s.value
-                      ? 'bg-slate-700 text-white'
-                      : 'text-slate-500 hover:text-slate-300'
-                  }`}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                  style={sort === s.value ? {
+                    background: `${s.color}18`,
+                    color: s.color,
+                    border: `1px solid ${s.color}35`,
+                  } : {
+                    color: '#64748b',
+                    border: '1px solid transparent',
+                  }}
                 >
                   {s.label}
                 </button>

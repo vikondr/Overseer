@@ -20,6 +20,10 @@ export default function ProjectPage() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [newSheetName, setNewSheetName] = useState('');
   const [showNewSheet, setShowNewSheet] = useState(false);
+  const [pendingFile, setPendingFile] = useState(null);
+  const [commitMessage, setCommitMessage] = useState('');
+  const [showCommitModal, setShowCommitModal] = useState(false);
+  const [fileError, setFileError] = useState('');
 
   const isOwner = user?.username === username;
 
@@ -63,13 +67,29 @@ export default function ProjectPage() {
     }
   };
 
-  const handleFileUpload = async (e) => {
+  const ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'svg', 'psd', 'ai', 'fig'];
+
+  const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file || !activeSheet) return;
-    const message = prompt('Commit message (optional)', '') ?? '';
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      setFileError(`File type ".${ext}" is not supported. Allowed: PNG, JPG, WEBP, SVG, PSD, AI, FIG`);
+      e.target.value = '';
+      return;
+    }
+    setFileError('');
+    setPendingFile({ file, inputRef: e.target });
+    setCommitMessage('');
+    setShowCommitModal(true);
+  };
+
+  const handleCommitConfirm = async () => {
+    if (!pendingFile) return;
+    setShowCommitModal(false);
     setUploadingFile(true);
     try {
-      await uploadSheetFile(activeSheet, file, message);
+      await uploadSheetFile(activeSheet, pendingFile.file, commitMessage);
       const updated = await getSheet(project.id, activeSheet);
       setSheetDetail(updated);
       setSheets((ss) =>
@@ -81,8 +101,17 @@ export default function ProjectPage() {
       alert(err.message);
     } finally {
       setUploadingFile(false);
-      e.target.value = '';
+      if (pendingFile.inputRef) pendingFile.inputRef.value = '';
+      setPendingFile(null);
+      setCommitMessage('');
     }
+  };
+
+  const handleCommitCancel = () => {
+    if (pendingFile?.inputRef) pendingFile.inputRef.value = '';
+    setPendingFile(null);
+    setCommitMessage('');
+    setShowCommitModal(false);
   };
 
   const handleCreateSheet = async (e) => {
@@ -324,19 +353,24 @@ export default function ProjectPage() {
                   )}
                 </div>
                 {isOwner && (
-                  <label
-                    className={`px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded-lg cursor-pointer transition-colors ${
-                      uploadingFile ? 'opacity-50 pointer-events-none' : ''
-                    }`}
-                  >
-                    {uploadingFile ? 'Uploading...' : '+ Upload File'}
-                    <input
-                      type="file"
-                      className="hidden"
-                      onChange={handleFileUpload}
-                      disabled={uploadingFile}
-                    />
-                  </label>
+                  <div className="flex flex-col items-end gap-1">
+                    <label
+                      className={`px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded-lg cursor-pointer transition-colors ${
+                        uploadingFile ? 'opacity-50 pointer-events-none' : ''
+                      }`}
+                    >
+                      {uploadingFile ? 'Uploading...' : '+ Upload File'}
+                      <input
+                        type="file"
+                        className="hidden"
+                        onChange={handleFileUpload}
+                        disabled={uploadingFile}
+                      />
+                    </label>
+                    {fileError && (
+                      <p className="text-red-400 text-xs max-w-xs text-right">{fileError}</p>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -369,6 +403,46 @@ export default function ProjectPage() {
           )}
         </div>
       </div>
+
+      {/* Commit Message Modal */}
+      {showCommitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCommitCancel} />
+          <div className="relative w-full max-w-md bg-slate-900 border border-slate-700/60 rounded-2xl shadow-2xl shadow-black/60 p-6">
+            <h3 className="text-white font-semibold text-base mb-1">Upload file</h3>
+            <p className="text-slate-500 text-sm mb-4 truncate">
+              {pendingFile?.file?.name}
+            </p>
+            <label className="block text-slate-400 text-xs font-medium mb-1.5 uppercase tracking-wider">
+              Commit message
+              <span className="normal-case font-normal text-slate-600 ml-1">(optional)</span>
+            </label>
+            <input
+              autoFocus
+              type="text"
+              value={commitMessage}
+              onChange={(e) => setCommitMessage(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleCommitConfirm(); if (e.key === 'Escape') handleCommitCancel(); }}
+              placeholder="Describe what changed…"
+              className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 text-white text-sm rounded-lg focus:outline-none focus:border-blue-500 placeholder:text-slate-600"
+            />
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={handleCommitCancel}
+                className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCommitConfirm}
+                className="flex-1 py-2 btn-primary text-sm rounded-lg font-medium"
+              >
+                Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* README */}
       {project.readmeContent && (

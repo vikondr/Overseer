@@ -56,6 +56,13 @@ services:
     depends_on:
       - backend
 
+  pixeldiff:
+    build:
+      context: ./overseer-pixeldiff
+    ports:
+      - "8001:8000"
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   azurite_data:

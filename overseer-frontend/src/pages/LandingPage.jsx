@@ -83,7 +83,7 @@ export default function LandingPage() {
             <span
               className="block"
               style={{
-                background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 40%, #f472b6 80%, #fb923c 100%)',
+                background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 40%, #f472b6 70%, #34d399 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
@@ -223,19 +223,14 @@ export default function LandingPage() {
       <section className="py-20 px-4">
         <div className="max-w-3xl mx-auto grid grid-cols-3 gap-6 text-center">
           {[
-            { value: '∞', label: 'Version history' },
-            { value: '100%', label: 'Free to use' },
-            { value: '0', label: 'Credit cards' },
-          ].map(({ value, label }) => (
+            { value: '∞', label: 'Version history', color: '#60a5fa' },
+            { value: '100%', label: 'Free to use', color: '#34d399' },
+            { value: '0', label: 'Credit cards', color: '#f472b6' },
+          ].map(({ value, label, color }) => (
             <div key={label} className="group">
               <p
                 className="text-5xl sm:text-6xl font-black mb-2 transition-all"
-                style={{
-                  background: 'linear-gradient(135deg, #f8fafc 0%, #64748b 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
-                }}
+                style={{ color }}
               >
                 {value}
               </p>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { createProject } from '../api/projects';
+import TagPicker from '../components/TagPicker';
 
 export default function NewProjectPage() {
   const { user } = useAuth();
@@ -10,7 +11,7 @@ export default function NewProjectPage() {
     name: '',
     description: '',
     visibility: 'PRIVATE',
-    tags: '',
+    tags: [],
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -22,15 +23,11 @@ export default function NewProjectPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const tags = form.tags
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean);
       const project = await createProject({
         name: form.name,
         description: form.description || undefined,
         visibility: form.visibility,
-        tags: tags.length ? tags : undefined,
+        tags: form.tags.length ? form.tags : undefined,
       });
       navigate(`/u/${user.username}/${project.slug}`);
     } catch (e) {
@@ -57,7 +54,7 @@ export default function NewProjectPage() {
               value={form.name}
               onChange={set('name')}
               placeholder="My awesome project"
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-blue-500 text-sm"
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
             />
           </div>
 
@@ -69,7 +66,7 @@ export default function NewProjectPage() {
               value={form.description}
               onChange={set('description')}
               placeholder="What is this project about?"
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-blue-500 text-sm resize-none"
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-blue-400 text-sm resize-none"
             />
           </div>
 
@@ -78,7 +75,7 @@ export default function NewProjectPage() {
             <select
               value={form.visibility}
               onChange={set('visibility')}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 text-white rounded-lg focus:outline-none focus:border-blue-500 text-sm"
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 text-white rounded-lg focus:outline-none focus:border-blue-400 text-sm"
             >
               <option value="PRIVATE">Private – only you</option>
               <option value="PUBLIC">Public – everyone</option>
@@ -87,16 +84,18 @@ export default function NewProjectPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Tags{' '}
-              <span className="text-slate-500 font-normal">(comma-separated)</span>
+            <label className="block text-sm font-medium text-slate-300 mb-3">
+              Tags
+              {form.tags.length > 0 && (
+                <span className="ml-2 text-xs font-normal text-blue-400">
+                  {form.tags.length} selected
+                </span>
+              )}
             </label>
-            <input
-              type="text"
-              value={form.tags}
-              onChange={set('tags')}
-              placeholder="design, ui, branding"
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 text-white placeholder-slate-500 rounded-lg focus:outline-none focus:border-blue-500 text-sm"
+            <TagPicker
+              selected={form.tags}
+              onChange={(tags) => setForm((f) => ({ ...f, tags }))}
+              max={8}
             />
           </div>
 
