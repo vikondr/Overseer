@@ -3,12 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { createProject } from '../api/projects';
 import TagPicker from '../components/TagPicker';
-
-const VISIBILITY_OPTIONS = [
-  { value: 'PRIVATE',  label: 'Private',   desc: 'Only you',           color: '#60a5fa' },
-  { value: 'PUBLIC',   label: 'Public',    desc: 'Everyone',           color: '#34d399' },
-  { value: 'UNLISTED', label: 'Unlisted',  desc: 'Only with link',     color: '#f472b6' },
-];
+import Section from '../components/Section';
+import VisibilityPicker from '../components/VisibilityPicker';
+import PageBanner from '../components/PageBanner';
+import AlertBanner from '../components/AlertBanner';
 
 export default function NewProjectPage() {
   const { user } = useAuth();
@@ -47,18 +45,7 @@ export default function NewProjectPage() {
     <div className="min-h-screen bg-slate-950 pt-14">
 
       {/* ── Header ──────────────────────────────────────────── */}
-      <div className="relative border-b border-slate-800/60 overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute inset-0" style={{
-            backgroundImage: 'radial-gradient(circle, #1e293b 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-            opacity: 0.4,
-          }} />
-          <div style={{ position: 'absolute', top: '-40%', left: '-5%', width: '40vw', height: '40vw', maxWidth: 400, maxHeight: 400,
-            background: 'radial-gradient(circle, rgba(96,165,250,0.1) 0%, transparent 65%)' }} />
-          <div style={{ position: 'absolute', bottom: '-20%', right: '5%', width: '30vw', height: '30vw', maxWidth: 320, maxHeight: 320,
-            background: 'radial-gradient(circle, rgba(52,211,153,0.08) 0%, transparent 65%)' }} />
-        </div>
+      <PageBanner>
         <div className="relative max-w-2xl mx-auto px-4 py-8">
           <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: '#34d399' }}>
             New project
@@ -66,7 +53,7 @@ export default function NewProjectPage() {
           <h1 className="text-3xl font-black text-white tracking-tight">Create a project</h1>
           <p className="text-slate-500 text-sm mt-1">Version your creative work from day one.</p>
         </div>
-      </div>
+      </PageBanner>
 
       {/* ── Form ────────────────────────────────────────────── */}
       <div className="max-w-2xl mx-auto px-4 py-8">
@@ -103,27 +90,10 @@ export default function NewProjectPage() {
 
           {/* Visibility section */}
           <Section color="#34d399" label="Visibility">
-            <div className="flex flex-col sm:flex-row gap-2">
-              {VISIBILITY_OPTIONS.map(({ value, label, desc, color }) => {
-                const active = form.visibility === value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setForm((f) => ({ ...f, visibility: value }))}
-                    className="flex-1 text-left px-4 py-3 rounded-xl border transition-all"
-                    style={
-                      active
-                        ? { borderColor: `${color}55`, background: `${color}0e`, color }
-                        : { borderColor: '#1e293b', background: 'transparent', color: '#475569' }
-                    }
-                  >
-                    <div className="font-semibold text-sm">{label}</div>
-                    <div className="text-xs mt-0.5 opacity-70">{desc}</div>
-                  </button>
-                );
-              })}
-            </div>
+            <VisibilityPicker
+              value={form.visibility}
+              onChange={(v) => setForm((f) => ({ ...f, visibility: v }))}
+            />
           </Section>
 
           {/* Tags section */}
@@ -145,11 +115,7 @@ export default function NewProjectPage() {
             </div>
           </Section>
 
-          {error && (
-            <p className="text-red-400 text-sm bg-red-900/20 border border-red-800/50 rounded-xl px-4 py-3">
-              {error}
-            </p>
-          )}
+          {error && <AlertBanner>{error}</AlertBanner>}
 
           <div className="flex gap-3 pt-2">
             <button
@@ -169,23 +135,6 @@ export default function NewProjectPage() {
           </div>
         </form>
       </div>
-    </div>
-  );
-}
-
-function Section({ color, label, children }) {
-  return (
-    <div className="rounded-xl border border-slate-800 overflow-hidden" style={{ background: 'rgba(15,23,42,0.6)' }}>
-      <div
-        className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-800"
-        style={{ background: `linear-gradient(90deg, ${color}10 0%, transparent 100%)` }}
-      >
-        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color }}>
-          {label}
-        </span>
-      </div>
-      <div className="p-4 space-y-4">{children}</div>
     </div>
   );
 }

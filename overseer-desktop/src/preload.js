@@ -1,2 +1,7 @@
-// See the Electron documentation for details on how to use preload scripts:
-// https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('electron', {
+  openGoogleAuth: (baseUrl) => ipcRenderer.invoke('open-google-auth', baseUrl),
+  selectFolder:   ()        => ipcRenderer.invoke('select-folder'),
+  readFile:       (p)       => ipcRenderer.invoke('read-file', p),
+});

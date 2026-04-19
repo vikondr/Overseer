@@ -3,12 +3,9 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getProjectBySlug, updateProject } from '../api/projects';
 import TagPicker from '../components/TagPicker';
-
-const VISIBILITY_OPTIONS = [
-  { value: 'PUBLIC',   label: 'Public',    desc: 'Anyone can see this project',           color: '#34d399' },
-  { value: 'UNLISTED', label: 'Unlisted',  desc: 'Only people with the link can see it',  color: '#f472b6' },
-  { value: 'PRIVATE',  label: 'Private',   desc: 'Only you can see this project',         color: '#60a5fa' },
-];
+import VisibilityPicker from '../components/VisibilityPicker';
+import LoadingPage from '../components/LoadingPage';
+import AlertBanner from '../components/AlertBanner';
 
 export default function EditProjectPage() {
   const { username, slug } = useParams();
@@ -78,14 +75,7 @@ export default function EditProjectPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 pt-14 flex items-center justify-center text-slate-500">
-        Loading…
-      </div>
-    );
-  }
-
+  if (loading) return <LoadingPage />;
   if (!project) return null;
 
   return (
@@ -150,27 +140,10 @@ export default function EditProjectPage() {
           {/* Visibility */}
           <div>
             <label className="block text-slate-300 text-sm font-medium mb-2">Visibility</label>
-            <div className="flex flex-col sm:flex-row gap-2">
-              {VISIBILITY_OPTIONS.map(({ value, label, desc, color }) => {
-                const active = form.visibility === value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setForm((f) => ({ ...f, visibility: value }))}
-                    className="flex-1 text-left px-4 py-3 rounded-xl border transition-all"
-                    style={
-                      active
-                        ? { borderColor: `${color}60`, background: `${color}10`, color }
-                        : { borderColor: '#334155', background: 'transparent', color: '#64748b' }
-                    }
-                  >
-                    <div className="font-medium text-sm">{label}</div>
-                    <div className="text-xs mt-0.5 opacity-70">{desc}</div>
-                  </button>
-                );
-              })}
-            </div>
+            <VisibilityPicker
+              value={form.visibility}
+              onChange={(v) => setForm((f) => ({ ...f, visibility: v }))}
+            />
           </div>
 
           {/* Tags */}
@@ -207,10 +180,7 @@ export default function EditProjectPage() {
             />
           </div>
 
-          {/* Error */}
-          {error && (
-            <p className="text-red-400 text-sm">{error}</p>
-          )}
+          {error && <AlertBanner>{error}</AlertBanner>}
 
           {/* Actions */}
           <div className="flex items-center gap-3 pt-2">

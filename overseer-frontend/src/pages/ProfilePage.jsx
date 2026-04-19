@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { getUser, followUser, unfollowUser } from '../api/users';
 import { getUserProjects, deleteProject } from '../api/projects';
 import ProjectCard from '../components/ProjectCard';
+import LoadingPage from '../components/LoadingPage';
 
 const SKILL_COLORS = ['#60a5fa', '#a78bfa', '#f472b6', '#34d399'];
 
@@ -68,21 +69,8 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 pt-14 flex items-center justify-center text-slate-500">
-        Loading…
-      </div>
-    );
-  }
-
-  if (!profile) {
-    return (
-      <div className="min-h-screen bg-slate-950 pt-14 flex items-center justify-center text-slate-500">
-        User not found.
-      </div>
-    );
-  }
+  if (loading) return <LoadingPage />;
+  if (!profile) return <LoadingPage message="User not found." />;
 
   return (
     <div className="min-h-screen bg-slate-950 pt-14">

@@ -4,6 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import { getProjectBySlug, starProject, unstarProject } from '../api/projects';
 import { getSheet, createSheet, deleteSheet } from '../api/sheets';
 import { uploadSheetFile } from '../api/files';
+import LoadingPage from '../components/LoadingPage';
+import Modal from '../components/Modal';
+import PageBanner from '../components/PageBanner';
 
 export default function ProjectPage() {
   const { username, slug } = useParams();
@@ -143,14 +146,7 @@ export default function ProjectPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 pt-14 flex items-center justify-center text-slate-500">
-        Loading…
-      </div>
-    );
-  }
-
+  if (loading) return <LoadingPage />;
   if (!project) return null;
 
   const visibilityColors = {
@@ -163,24 +159,7 @@ export default function ProjectPage() {
     <div className="min-h-screen bg-slate-950 pt-14">
 
       {/* ── Project Banner ──────────────────────────────────── */}
-      <div className="relative border-b border-slate-800/60 overflow-hidden">
-        {/* Background layer */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute inset-0" style={{
-            backgroundImage: 'radial-gradient(circle, #1e293b 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-            opacity: 0.45,
-          }} />
-          <div style={{ position: 'absolute', top: '-30%', left: '-5%', width: '45vw', height: '45vw', maxWidth: 450, maxHeight: 450,
-            background: 'radial-gradient(circle, rgba(96,165,250,0.11) 0%, transparent 65%)' }} />
-          <div style={{ position: 'absolute', top: '5%', left: '28%', width: '30vw', height: '30vw', maxWidth: 320, maxHeight: 320,
-            background: 'radial-gradient(circle, rgba(167,139,250,0.09) 0%, transparent 65%)' }} />
-          <div style={{ position: 'absolute', bottom: '-25%', right: '5%', width: '38vw', height: '38vw', maxWidth: 380, maxHeight: 380,
-            background: 'radial-gradient(circle, rgba(244,114,182,0.07) 0%, transparent 65%)' }} />
-          <div style={{ position: 'absolute', top: '30%', right: '20%', width: '20vw', height: '20vw', maxWidth: 220, maxHeight: 220,
-            background: 'radial-gradient(circle, rgba(52,211,153,0.06) 0%, transparent 65%)' }} />
-        </div>
-
+      <PageBanner>
         <div className="relative max-w-7xl mx-auto px-4 py-8">
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm mb-4">
@@ -264,7 +243,7 @@ export default function ProjectPage() {
             </div>
           </div>
         </div>
-      </div>
+      </PageBanner>
 
       {/* ── Main layout ─────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-4 py-6 flex gap-6">
@@ -464,53 +443,40 @@ export default function ProjectPage() {
       </div>
 
       {/* ── Commit Message Modal ─────────────────────────────── */}
-      {showCommitModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={handleCommitCancel} />
-          <div
-            className="relative w-full max-w-md border border-slate-700/50 rounded-2xl shadow-2xl shadow-black/60 p-6 overflow-hidden"
-            style={{ background: 'linear-gradient(135deg, #0d1424 0%, #111827 100%)' }}
+      <Modal open={showCommitModal} onClose={handleCommitCancel}>
+        <h3 className="text-white font-semibold text-base mb-0.5">Upload file</h3>
+        <p className="text-slate-600 text-xs mb-5 font-mono truncate">{pendingFile?.file?.name}</p>
+        <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">
+          Commit message
+          <span className="normal-case font-normal text-slate-700 ml-1">(optional)</span>
+        </label>
+        <input
+          autoFocus
+          type="text"
+          value={commitMessage}
+          onChange={(e) => setCommitMessage(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleCommitConfirm();
+            if (e.key === 'Escape') handleCommitCancel();
+          }}
+          placeholder="Describe what changed…"
+          className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 text-white text-sm rounded-xl focus:outline-none focus:border-blue-500 placeholder:text-slate-700 transition-colors"
+        />
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={handleCommitCancel}
+            className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 text-sm rounded-xl transition-colors"
           >
-            {/* Accent blob */}
-            <div
-              className="absolute top-0 right-0 w-36 h-36 pointer-events-none"
-              style={{ background: 'radial-gradient(circle at 100% 0%, rgba(96,165,250,0.1) 0%, transparent 70%)' }}
-            />
-            <h3 className="text-white font-semibold text-base mb-0.5">Upload file</h3>
-            <p className="text-slate-600 text-xs mb-5 font-mono truncate">{pendingFile?.file?.name}</p>
-            <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">
-              Commit message
-              <span className="normal-case font-normal text-slate-700 ml-1">(optional)</span>
-            </label>
-            <input
-              autoFocus
-              type="text"
-              value={commitMessage}
-              onChange={(e) => setCommitMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCommitConfirm();
-                if (e.key === 'Escape') handleCommitCancel();
-              }}
-              placeholder="Describe what changed…"
-              className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 text-white text-sm rounded-xl focus:outline-none focus:border-blue-500 placeholder:text-slate-700 transition-colors"
-            />
-            <div className="flex gap-2 mt-4">
-              <button
-                onClick={handleCommitCancel}
-                className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 text-sm rounded-xl transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCommitConfirm}
-                className="flex-1 py-2 btn-primary text-sm rounded-xl font-semibold"
-              >
-                Upload
-              </button>
-            </div>
-          </div>
+            Cancel
+          </button>
+          <button
+            onClick={handleCommitConfirm}
+            className="flex-1 py-2 btn-primary text-sm rounded-xl font-semibold"
+          >
+            Upload
+          </button>
         </div>
-      )}
+      </Modal>
 
       {/* ── README ──────────────────────────────────────────── */}
       {project.readmeContent && (

@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { updateProfile } from '../api/users';
 import TagPicker from '../components/TagPicker';
+import Section from '../components/Section';
+import Field from '../components/Field';
+import AlertBanner from '../components/AlertBanner';
 
 export default function SettingsPage() {
   const { user, reload } = useAuth();
@@ -81,7 +84,6 @@ export default function SettingsPage() {
             className="relative rounded-2xl overflow-hidden mb-8 border border-slate-800"
             style={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.07) 0%, rgba(167,139,250,0.07) 100%)' }}
           >
-            {/* Accent blobs */}
             <div className="absolute top-0 right-0 w-40 h-40 pointer-events-none"
               style={{ background: 'radial-gradient(circle, rgba(167,139,250,0.12) 0%, transparent 70%)' }} />
             <div className="absolute bottom-0 left-0 w-32 h-32 pointer-events-none"
@@ -154,17 +156,8 @@ export default function SettingsPage() {
             </div>
           </Section>
 
-          {error && (
-            <p className="text-red-400 text-sm bg-red-900/20 border border-red-800/50 rounded-xl px-4 py-3">
-              {error}
-            </p>
-          )}
-          {success && (
-            <p className="text-emerald-400 text-sm border rounded-xl px-4 py-3"
-              style={{ background: 'rgba(52,211,153,0.08)', borderColor: 'rgba(52,211,153,0.3)' }}>
-              Profile updated successfully.
-            </p>
-          )}
+          {error && <AlertBanner>{error}</AlertBanner>}
+          {success && <AlertBanner type="success">Profile updated successfully.</AlertBanner>}
 
           <div className="pt-2">
             <button
@@ -177,51 +170,6 @@ export default function SettingsPage() {
           </div>
         </form>
       </div>
-    </div>
-  );
-}
-
-function Section({ color, label, children }) {
-  return (
-    <div
-      className="rounded-xl border border-slate-800 overflow-hidden"
-      style={{ background: 'rgba(15,23,42,0.6)' }}
-    >
-      {/* Section header strip */}
-      <div
-        className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-800"
-        style={{ background: `linear-gradient(90deg, ${color}12 0%, transparent 100%)` }}
-      >
-        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color }}>
-          {label}
-        </span>
-      </div>
-      <div className="p-4 space-y-4">{children}</div>
-    </div>
-  );
-}
-
-function Field({ label, hint, value, onChange, type = 'text', multiline = false }) {
-  const inputClass =
-    'w-full px-3 py-2 bg-slate-900 border border-slate-700 text-white placeholder-slate-600 rounded-lg focus:outline-none focus:border-blue-400 text-sm transition-colors';
-  return (
-    <div>
-      <label className="block text-sm font-medium text-slate-300 mb-1.5">
-        {label}
-        {hint && <span className="text-slate-600 font-normal ml-1.5 text-xs">({hint})</span>}
-      </label>
-      {multiline ? (
-        <textarea
-          rows={3}
-          maxLength={500}
-          value={value}
-          onChange={onChange}
-          className={`${inputClass} resize-none`}
-        />
-      ) : (
-        <input type={type} value={value} onChange={onChange} className={inputClass} />
-      )}
     </div>
   );
 }
