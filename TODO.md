@@ -7,3 +7,13 @@
 [+] add the ability to edit profile — Settings page with Identity/Links/Skills sections, profile preview card, tag picker for skills
 [+] explore azurite as a possible option for free hosting and everything
 [+] make the ui for the desktop page as vibrant as possible
+[+] fix profile pictures not loading — added referrerPolicy="no-referrer" to all avatar <img> tags (Google CDN rejects requests with a Referer header)
+[+] add GitHub Actions CI — .github/workflows/ci.yml; three parallel jobs: frontend lint+build, backend compile (tests skipped — contextLoads needs live Postgres), pixeldiff install+syntax check
+
+[ ] wire pixel diff into the UI — "Compare versions" button on FileRow in ProjectPage and WorkspacePage; call the FastAPI /diff endpoint, show the SSIM score and diff image in a modal
+[+] fix duplicate const path = require('path') in overseer-desktop/src/index.js — will crash Electron in strict mode
+[+] fix following state not loaded on mount — added GET /api/users/{username}/follow endpoint; ProfilePage now fetches follow status on mount alongside the profile
+[ ] remove file upload from the web client — TODO says commits are desktop-only; the Upload File button still exists in ProjectPage for owners
+[ ] render README as markdown — ProjectPage wraps readmeContent in a <pre>; replace with a proper markdown renderer (e.g. marked + DOMPurify)
+[ ] image lightbox / preview — clicking a FileRow triggers a download; add a full-screen preview for image files (sets up the pixel diff flow too)
+[ ] add information about the project to the README.md file (add diagrams, stack, etc etc)

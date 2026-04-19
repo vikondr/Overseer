@@ -59,6 +59,7 @@ export default function Navbar() {
                   <img
                     src={user.avatarUrl}
                     alt={user.username}
+                    referrerPolicy="no-referrer"
                     className="w-8 h-8 rounded-full object-cover ring-1 ring-slate-700"
                   />
                 ) : (

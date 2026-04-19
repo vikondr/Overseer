@@ -16,8 +16,8 @@ export function createApi(baseUrl, token) {
 
   return {
     getMe: () => get('/api/auth/me'),
-    getProjects: (username) => get(`/api/users/${username}/projects`),
-    getProjectBySlug: (username, slug) => get(`/api/projects/${username}/${slug}`),
+    getProjects: (username) => get(`/api/projects/user/${username}`),
+    getProjectBySlug: (username, slug) => get(`/api/projects/by/${username}/${slug}`),
     getSheet: (projectId, sheetId) => get(`/api/projects/${projectId}/sheets/${sheetId}`),
     getSheets: (projectId) => get(`/api/projects/${projectId}/sheets`),
 
@@ -27,7 +27,7 @@ export function createApi(baseUrl, token) {
     uploadFile: (sheetId, file, commitMessage) => {
       const fd = new FormData();
       fd.append('file', file);
-      if (commitMessage) fd.append('commitMessage', commitMessage);
+      if (commitMessage) fd.append('message', commitMessage);
       return fetch(`${baseUrl}/api/sheets/${sheetId}/files`, {
         method: 'POST',
         headers: hRaw,

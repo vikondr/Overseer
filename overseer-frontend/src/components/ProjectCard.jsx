@@ -116,7 +116,7 @@ export default function ProjectCard({ project }) {
 
           <div className="flex items-center gap-1.5 text-slate-600 text-xs shrink-0">
             {owner?.avatarUrl ? (
-              <img src={owner.avatarUrl} alt={owner.username} className="w-4 h-4 rounded-full ring-1 ring-slate-700" />
+              <img src={owner.avatarUrl} alt={owner.username} referrerPolicy="no-referrer" className="w-4 h-4 rounded-full ring-1 ring-slate-700" />
             ) : (
               <div className="w-4 h-4 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 text-[8px] font-bold">
                 {owner?.username?.[0]?.toUpperCase()}

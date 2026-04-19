@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getUser, followUser, unfollowUser } from '../api/users';
+import { getUser, isFollowingUser, followUser, unfollowUser } from '../api/users';
 import { getUserProjects, deleteProject } from '../api/projects';
 import ProjectCard from '../components/ProjectCard';
 import LoadingPage from '../components/LoadingPage';
@@ -30,14 +30,17 @@ export default function ProfilePage() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([getUser(username), getUserProjects(username)])
-      .then(([p, projs]) => {
+    const requests = [getUser(username), getUserProjects(username)];
+    if (me && me.username !== username) requests.push(isFollowingUser(username));
+    Promise.all(requests)
+      .then(([p, projs, followingStatus]) => {
         setProfile(p);
         setProjects(projs);
+        if (followingStatus !== undefined) setFollowing(followingStatus);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [username]);
+  }, [username, me]);
 
   const toggleFollow = async () => {
     if (!me) return;
@@ -131,7 +134,7 @@ export default function ProfilePage() {
             style={{ boxShadow: '0 0 0 4px #020617' }}
           >
             {profile.avatarUrl ? (
-              <img src={profile.avatarUrl} alt={profile.username} className="w-full h-full object-cover" />
+              <img src={profile.avatarUrl} alt={profile.username} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full avatar-gradient flex items-center justify-center text-white text-2xl font-bold">
                 {profile.username[0].toUpperCase()}

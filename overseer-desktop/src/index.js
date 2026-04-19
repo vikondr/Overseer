@@ -1,7 +1,8 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
-const fs   = require('fs');
-const path = require('path');
-const path = require('path');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const fs    = require('fs');
+const path  = require('path');
+const https = require('https');
+const http  = require('http');
 
 if (require('electron-squirrel-startup')) app.quit();
 
@@ -80,6 +81,22 @@ ipcMain.handle('open-google-auth', (event, baseUrl) => {
     authWin.webContents.on('will-navigate', intercept);
     authWin.on('closed', () => reject(new Error('cancelled')));
   });
+});
+
+// Download a file from the API and open it with the system's default app
+ipcMain.handle('open-file', async (_, { url, fileName, token }) => {
+  const tmpPath = path.join(app.getPath('temp'), fileName);
+  await new Promise((resolve, reject) => {
+    const protocol = url.startsWith('https') ? https : http;
+    const req = protocol.get(url, { headers: { Authorization: `Bearer ${token}` } }, (res) => {
+      const out = fs.createWriteStream(tmpPath);
+      res.pipe(out);
+      out.on('finish', resolve);
+      out.on('error', reject);
+    });
+    req.on('error', reject);
+  });
+  return shell.openPath(tmpPath);
 });
 
 app.whenReady().then(createWindow);

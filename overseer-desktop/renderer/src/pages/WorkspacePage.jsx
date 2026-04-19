@@ -125,9 +125,12 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
           <div className="relative flex items-center gap-2.5">
             <div
               className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-black shrink-0"
-              style={{ background: 'linear-gradient(135deg, #60a5fa22 0%, #a78bfa22 100%)', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }}
+              style={{ background: 'linear-gradient(135deg, #60a5fa22 0%, #a78bfa22 100%)', border: '1px solid rgba(96,165,250,0.3)' }}
             >
-              ◈
+              <svg viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
             </div>
             <span
               className="font-black text-sm tracking-tight"
@@ -147,7 +150,7 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
         <div className="px-4 py-3 border-b border-slate-800/40 shrink-0">
           <div className="flex items-center gap-2.5">
             {user.avatarUrl ? (
-              <img src={user.avatarUrl} alt={user.username} className="w-8 h-8 rounded-full shrink-0 ring-1 ring-slate-700" />
+              <img src={user.avatarUrl} alt={user.username} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full shrink-0 ring-1 ring-slate-700" />
             ) : (
               <div className="w-8 h-8 rounded-full shrink-0 avatar-gradient flex items-center justify-center text-white text-xs font-bold">
                 {user.username[0].toUpperCase()}
@@ -365,10 +368,13 @@ function EmptyState() {
           background: 'radial-gradient(circle, rgba(167,139,250,0.05) 0%, transparent 65%)' }} />
       </div>
       <div
-        className="relative w-16 h-16 rounded-2xl mb-5 flex items-center justify-center text-2xl"
+        className="relative w-16 h-16 rounded-2xl mb-5 flex items-center justify-center"
         style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)' }}
       >
-        ◈
+        <svg viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
       </div>
       <p className="text-white font-semibold mb-1">Select a project</p>
       <p className="text-slate-600 text-sm">Choose a project from the sidebar to get started.</p>
@@ -553,6 +559,14 @@ function FileTable({ files, baseUrl, token }) {
 }
 
 function FileRow({ file, last, baseUrl, token }) {
+  const handleOpen = async () => {
+    const url = `${baseUrl}/api/files/${file.id}/download`;
+    try {
+      await window.electron.openFile(url, file.fileName, token);
+    } catch (e) {
+      console.error('Failed to open file:', e);
+    }
+  };
   const ext = file.fileName.split('.').pop()?.toUpperCase() ?? '';
   const isImage = file.mimeType?.startsWith('image/');
 
@@ -614,14 +628,25 @@ function FileRow({ file, last, baseUrl, token }) {
       <span className="w-12 text-right text-slate-700 text-[11px] font-mono shrink-0">{sizeStr}</span>
       <span className="w-12 text-right text-slate-700 text-[11px] shrink-0">{timeStr}</span>
 
-      <a
-        href={dlUrl}
-        download={file.fileName}
-        className="w-5 shrink-0 text-center text-slate-700 hover:text-blue-400 text-sm opacity-0 group-hover:opacity-100 transition-all"
-        title="Download"
-      >
-        ↓
-      </a>
+      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
+        {isImage && (
+          <button
+            onClick={handleOpen}
+            className="w-5 text-center text-slate-700 hover:text-violet-400 text-sm"
+            title="Open in Photos"
+          >
+            ⊙
+          </button>
+        )}
+        <a
+          href={dlUrl}
+          download={file.fileName}
+          className="w-5 text-center text-slate-700 hover:text-blue-400 text-sm"
+          title="Download"
+        >
+          ↓
+        </a>
+      </div>
     </div>
   );
 }
