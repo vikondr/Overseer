@@ -1,6 +1,6 @@
 const PALETTE = ['#60a5fa', '#a78bfa', '#f472b6', '#34d399'];
 
-export const CREATIVE_TAGS = [
+const CREATIVE_TAGS = [
   'UI Design', 'UX Design', 'Branding', 'Visual Identity', 'Typography',
   'Illustration', 'Motion Graphics', '3D Art', 'Web Design', 'Logo Design',
   'Photography', 'Concept Art', 'Packaging', 'Icon Design', 'Product Design',

@@ -46,6 +46,7 @@ jobs:
           cache: maven
 
       # Skip tests — the only test (contextLoads) requires a live PostgreSQL instance
+      - run: chmod +x mvnw
       - run: ./mvnw --batch-mode package -DskipTests
 
   # ── Pixel Diff ──────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getUser, isFollowingUser, followUser, unfollowUser } from '../api/users';
 import { getUserProjects, deleteProject } from '../api/projects';
@@ -18,8 +18,6 @@ function greeting() {
 export default function ProfilePage() {
   const { username } = useParams();
   const { user: me } = useAuth();
-  const navigate = useNavigate();
-
   const [profile, setProfile]     = useState(null);
   const [projects, setProjects]   = useState([]);
   const [loading, setLoading]     = useState(true);
