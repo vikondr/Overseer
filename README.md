@@ -64,6 +64,21 @@ graph TD
 
 ---
 
+## Project structure
+
+```
+Overseer/
+├── overseer-backend/      # Spring Boot · REST API, auth, Postgres, Azure blob
+├── overseer-frontend/     # React + Vite · web client (read-only for commits)
+├── overseer-desktop/      # Electron + React · commit pushes
+├── overseer-pixeldiff/    # FastAPI · SSIM perceptual diff microservice
+├── docker-compose.yml     # Orchestrates all four services + Postgres + Azurite
+├── .env.docker.example    # Template for Docker env vars
+└── .github/workflows/     # CI: lint + build for all services
+```
+
+---
+
 ## Features
 
 - **Google OAuth2 + JWT authentication** — secure sign-in, protected routes, auth callback flow
@@ -107,12 +122,66 @@ journey
 
 ---
 
+## Getting started
+
+### Prerequisites
+
+- **Docker** + Docker Compose (recommended path)
+- For local dev outside Docker: **Node 20+**, **JDK 21**, **Python 3.11+**, **Maven 3.9+**
+
+### Run with Docker Compose
+
+```bash
+cp .env.docker.example .env
+# edit .env: fill in GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET
+docker compose up --build
+```
+
+Services come up at:
+
+- Frontend: http://localhost:5173
+- Backend:  http://localhost:8080 (Swagger at `/swagger-ui.html`)
+- Pixel diff: http://localhost:8001
+- Postgres: `localhost:5432` (user `overseer`, db `overseer`)
+- Azurite:  http://localhost:10000
+
+### Run services individually (dev mode)
+
+```bash
+# Backend (Spring Boot)
+cd overseer-backend && ./mvnw spring-boot:run
+
+# Frontend (Vite)
+cd overseer-frontend && npm install && npm run dev
+
+# Pixel diff (FastAPI)
+cd overseer-pixeldiff && pip install -r requirements.txt && uvicorn main:app --reload --port 8001
+
+# Desktop app (Electron + Vite)
+cd overseer-desktop && npm install && npm start
+```
+
+The frontend dev server proxies `/api` → backend `:8080` and `/pixeldiff` → pixel diff `:8001`, so no CORS config is needed locally.
+
+### Environment variables
+
+See `.env.docker.example` for the full list. The minimum to boot the backend:
+
+| Variable | Purpose |
+|---|---|
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth2 credentials |
+| `JWT_SECRET` | ≥32-char random string used to sign JWTs |
+| `FRONTEND_URL` | Origin used for the OAuth2 redirect back to the SPA |
+
+---
+
 ## Changelog
 
-| Version | Date       | Changes                                                                                                                                                                                                                                                                  |
-|---------|------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 0.1.0   | 2026-03-18 | Spring Boot backend (Java 21) with Google OAuth2 + JWT auth, REST endpoints for users/projects/sheets/files, PostgreSQL via JPA, Swagger UI with Bearer token support, Docker Compose with PostgreSQL service, React + Vite frontend scaffold, Electron desktop scaffold |
-| 0.1.1   | 2026-04-04 | React + Tailwind frontend, Azurite for local blob storage                                                                                                                                                                                                               |
-| 0.1.2   | 2026-04-07 | Full authentication flow (Google OAuth2 callback, JWT context, protected routes), all main pages (Landing, Dashboard, Explore, Profile, Project, NewProject, Settings, NotFound), API client layer, ProjectCard component, Navbar                                        |
-| 0.1.3   | 2026-04-08 | FastAPI pixel diff microservice (SSIM) in `overseer-pixeldiff/` on port 8001, EditProject page, TagPicker component, Settings page with Identity/Links/Skills sections, profile page overhaul, consistent color palette, fixed Google avatar loading (`referrerPolicy="no-referrer"`) |
-| 0.1.4   | 2026-04-19 | Expanded frontend pages (ProjectPage, NewProjectPage, NotFoundPage), desktop app pages (Login, Workspace, PushFolderModal), Electron IPC for git-style pushes, reusable components (Modal, PageBanner, Section, Field, AlertBanner, VisibilityPicker), GitHub Actions CI |
+| Version | Date       | Changes                                                                                                                                                                                                                                                                                                              |
+|---------|------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 0.1.0   | 2026-03-18 | Spring Boot backend (Java 21) with Google OAuth2 + JWT auth, REST endpoints for users/projects/sheets/files, PostgreSQL via JPA, Swagger UI with Bearer token support, Docker Compose with PostgreSQL service, React + Vite frontend scaffold, Electron desktop scaffold                                             |
+| 0.1.1   | 2026-04-04 | React + Tailwind frontend, Azurite for local blob storage                                                                                                                                                                                                                                                            |
+| 0.1.2   | 2026-04-07 | Full authentication flow (Google OAuth2 callback, JWT context, protected routes), all main pages (Landing, Dashboard, Explore, Profile, Project, NewProject, Settings, NotFound), API client layer, ProjectCard component, Navbar                                                                                    |
+| 0.1.3   | 2026-04-08 | FastAPI pixel diff microservice (SSIM) in `overseer-pixeldiff/` on port 8001, EditProject page, TagPicker component, Settings page with Identity/Links/Skills sections, profile page overhaul, consistent color palette, fixed Google avatar loading (`referrerPolicy="no-referrer"`)                                |
+| 0.1.4   | 2026-04-19 | Expanded frontend pages (ProjectPage, NewProjectPage, NotFoundPage), desktop app pages (Login, Workspace, PushFolderModal), Electron IPC for git-style pushes, reusable components (Modal, PageBanner, Section, Field, AlertBanner, VisibilityPicker), GitHub Actions CI                                             |
+| 0.1.5   | 2026-04-26 | Image lightbox preview on web ProjectPage, "Compare versions" pixel-diff modal (web + desktop) calling the FastAPI SSIM service, web upload UI removed (commits are now desktop-only), README rendered as sanitized markdown via marked + DOMPurify, expanded README with project structure and getting-started docs |

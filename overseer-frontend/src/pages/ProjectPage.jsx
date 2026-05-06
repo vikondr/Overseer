@@ -3,10 +3,11 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getProjectBySlug, starProject, unstarProject } from '../api/projects';
 import { getSheet, createSheet, deleteSheet } from '../api/sheets';
-import { uploadSheetFile } from '../api/files';
 import LoadingPage from '../components/LoadingPage';
-import Modal from '../components/Modal';
 import PageBanner from '../components/PageBanner';
+import ImageLightbox from '../components/ImageLightbox';
+import CompareVersionsModal from '../components/CompareVersionsModal';
+import Markdown from '../components/Markdown';
 
 export default function ProjectPage() {
   const { username, slug } = useParams();
@@ -20,13 +21,10 @@ export default function ProjectPage() {
   const [loading, setLoading] = useState(true);
   const [starred, setStarred] = useState(false);
   const [starLoading, setStarLoading] = useState(false);
-  const [uploadingFile, setUploadingFile] = useState(false);
   const [newSheetName, setNewSheetName] = useState('');
   const [showNewSheet, setShowNewSheet] = useState(false);
-  const [pendingFile, setPendingFile] = useState(null);
-  const [commitMessage, setCommitMessage] = useState('');
-  const [showCommitModal, setShowCommitModal] = useState(false);
-  const [fileError, setFileError] = useState('');
+  const [previewFile, setPreviewFile] = useState(null);
+  const [compareFile, setCompareFile] = useState(null);
 
   const isOwner = user?.username === username;
 
@@ -68,53 +66,6 @@ export default function ProjectPage() {
     } finally {
       setStarLoading(false);
     }
-  };
-
-  const ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'svg', 'psd', 'ai', 'fig'];
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file || !activeSheet) return;
-    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-    if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      setFileError(`File type ".${ext}" is not supported. Allowed: PNG, JPG, WEBP, SVG, PSD, AI, FIG`);
-      e.target.value = '';
-      return;
-    }
-    setFileError('');
-    setPendingFile({ file, inputRef: e.target });
-    setCommitMessage('');
-    setShowCommitModal(true);
-  };
-
-  const handleCommitConfirm = async () => {
-    if (!pendingFile) return;
-    setShowCommitModal(false);
-    setUploadingFile(true);
-    try {
-      await uploadSheetFile(activeSheet, pendingFile.file, commitMessage);
-      const updated = await getSheet(project.id, activeSheet);
-      setSheetDetail(updated);
-      setSheets((ss) =>
-        ss.map((s) =>
-          s.id === activeSheet ? { ...s, fileCount: updated.files?.length ?? s.fileCount } : s
-        )
-      );
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setUploadingFile(false);
-      if (pendingFile.inputRef) pendingFile.inputRef.value = '';
-      setPendingFile(null);
-      setCommitMessage('');
-    }
-  };
-
-  const handleCommitCancel = () => {
-    if (pendingFile?.inputRef) pendingFile.inputRef.value = '';
-    setPendingFile(null);
-    setCommitMessage('');
-    setShowCommitModal(false);
   };
 
   const handleCreateSheet = async (e) => {
@@ -380,21 +331,11 @@ export default function ProjectPage() {
                   )}
                 </div>
                 {isOwner && (
-                  <div className="flex flex-col items-end gap-1">
-                    <label
-                      className={`flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/80 border border-slate-800 hover:border-blue-600/60 text-slate-400 hover:text-blue-300 text-sm rounded-xl cursor-pointer transition-all ${
-                        uploadingFile ? 'opacity-50 pointer-events-none' : ''
-                      }`}
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                      </svg>
-                      {uploadingFile ? 'Uploading…' : 'Upload File'}
-                      <input type="file" className="hidden" onChange={handleFileUpload} disabled={uploadingFile} />
-                    </label>
-                    {fileError && (
-                      <p className="text-red-400 text-xs max-w-xs text-right">{fileError}</p>
-                    )}
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 border border-slate-800 text-slate-500 text-xs rounded-xl">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    Push commits via the desktop app
                   </div>
                 )}
               </div>
@@ -410,7 +351,7 @@ export default function ProjectPage() {
                     </svg>
                   </div>
                   <p className="text-slate-600 text-sm">
-                    {isOwner ? 'Upload files to get started.' : 'No files in this sheet.'}
+                    {isOwner ? 'Push files via the desktop app to get started.' : 'No files in this sheet.'}
                   </p>
                 </div>
               ) : (
@@ -433,6 +374,8 @@ export default function ProjectPage() {
                       key={file.id}
                       file={file}
                       last={i === sheetDetail.files.length - 1}
+                      onPreview={() => setPreviewFile(file)}
+                      onCompare={() => setCompareFile(file)}
                     />
                   ))}
                 </div>
@@ -441,42 +384,6 @@ export default function ProjectPage() {
           )}
         </div>
       </div>
-
-      {/* ── Commit Message Modal ─────────────────────────────── */}
-      <Modal open={showCommitModal} onClose={handleCommitCancel}>
-        <h3 className="text-white font-semibold text-base mb-0.5">Upload file</h3>
-        <p className="text-slate-600 text-xs mb-5 font-mono truncate">{pendingFile?.file?.name}</p>
-        <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">
-          Commit message
-          <span className="normal-case font-normal text-slate-700 ml-1">(optional)</span>
-        </label>
-        <input
-          autoFocus
-          type="text"
-          value={commitMessage}
-          onChange={(e) => setCommitMessage(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleCommitConfirm();
-            if (e.key === 'Escape') handleCommitCancel();
-          }}
-          placeholder="Describe what changed…"
-          className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 text-white text-sm rounded-xl focus:outline-none focus:border-blue-500 placeholder:text-slate-700 transition-colors"
-        />
-        <div className="flex gap-2 mt-4">
-          <button
-            onClick={handleCommitCancel}
-            className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 text-sm rounded-xl transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleCommitConfirm}
-            className="flex-1 py-2 btn-primary text-sm rounded-xl font-semibold"
-          >
-            Upload
-          </button>
-        </div>
-      </Modal>
 
       {/* ── README ──────────────────────────────────────────── */}
       {project.readmeContent && (
@@ -491,12 +398,33 @@ export default function ProjectPage() {
                 README
               </span>
             </div>
-            <pre className="p-6 text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-mono overflow-x-auto bg-slate-950/40">
-              {project.readmeContent}
-            </pre>
+            <div className="p-6 bg-slate-950/40 overflow-x-auto">
+              <Markdown source={project.readmeContent} />
+            </div>
           </div>
         </div>
       )}
+
+      {/* ── Image Lightbox ──────────────────────────────────── */}
+      <ImageLightbox
+        open={!!previewFile}
+        onClose={() => setPreviewFile(null)}
+        src={previewFile ? `/api/files/${previewFile.id}/download` : ''}
+        fileName={previewFile?.fileName ?? ''}
+        downloadHref={previewFile ? `/api/files/${previewFile.id}/download` : ''}
+        onCompareVersions={previewFile ? () => {
+          setCompareFile(previewFile);
+          setPreviewFile(null);
+        } : undefined}
+      />
+
+      {/* ── Compare Versions Modal ──────────────────────────── */}
+      <CompareVersionsModal
+        open={!!compareFile}
+        onClose={() => setCompareFile(null)}
+        file={compareFile}
+        sheetId={activeSheet}
+      />
     </div>
   );
 }
@@ -553,24 +481,48 @@ function FileTypeIcon({ file }) {
   );
 }
 
-function FileRow({ file, last }) {
+function FileRow({ file, last, onPreview, onCompare }) {
+  const isImage = file.mimeType?.startsWith('image/');
+
   return (
     <div
       className={`group flex items-center gap-3 px-4 py-2.5 hover:bg-slate-900/60 transition-colors ${
         !last ? 'border-b border-slate-800/50' : ''
       }`}
     >
-      <FileTypeIcon file={file} />
+      {isImage ? (
+        <button
+          type="button"
+          onClick={onPreview}
+          className="shrink-0 cursor-zoom-in"
+          title="Preview"
+        >
+          <FileTypeIcon file={file} />
+        </button>
+      ) : (
+        <FileTypeIcon file={file} />
+      )}
 
-      <a
-        href={`/api/files/${file.id}/download`}
-        target="_blank"
-        rel="noreferrer"
-        className="flex-1 text-slate-300 text-sm hover:text-white truncate font-mono min-w-0 transition-colors"
-        title={file.fileName}
-      >
-        {file.fileName}
-      </a>
+      {isImage ? (
+        <button
+          type="button"
+          onClick={onPreview}
+          className="flex-1 text-left text-slate-300 text-sm hover:text-white truncate font-mono min-w-0 transition-colors cursor-zoom-in"
+          title={file.fileName}
+        >
+          {file.fileName}
+        </button>
+      ) : (
+        <a
+          href={`/api/files/${file.id}/download`}
+          target="_blank"
+          rel="noreferrer"
+          className="flex-1 text-slate-300 text-sm hover:text-white truncate font-mono min-w-0 transition-colors"
+          title={file.fileName}
+        >
+          {file.fileName}
+        </a>
+      )}
 
       <span className="w-10 shrink-0 px-1.5 py-0.5 text-center text-[10px] rounded-md font-mono bg-blue-950/50 text-blue-400 border border-blue-800/30">
         v{file.version}
@@ -595,14 +547,26 @@ function FileRow({ file, last }) {
         {fileTimeAgo(file.createdAt)}
       </span>
 
-      <a
-        href={`/api/files/${file.id}/download`}
-        download={file.fileName}
-        className="w-5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-blue-400 text-sm text-center"
-        title="Download"
-      >
-        ↓
-      </a>
+      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        {isImage && file.version > 1 && (
+          <button
+            type="button"
+            onClick={onCompare}
+            className="w-5 text-slate-500 hover:text-violet-400 text-sm text-center"
+            title="Compare versions"
+          >
+            ⇄
+          </button>
+        )}
+        <a
+          href={`/api/files/${file.id}/download`}
+          download={file.fileName}
+          className="w-5 text-slate-500 hover:text-blue-400 text-sm text-center"
+          title="Download"
+        >
+          ↓
+        </a>
+      </div>
     </div>
   );
 }

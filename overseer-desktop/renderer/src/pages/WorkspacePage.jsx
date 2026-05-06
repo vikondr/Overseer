@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createApi } from '../api';
 import PushFolderModal from './PushFolderModal';
+import CompareVersionsModal from './CompareVersionsModal';
+import ForkSheetModal from './ForkSheetModal';
+import MergeSheetModal from './MergeSheetModal';
 
 const PALETTE = ['#60a5fa', '#a78bfa', '#f472b6', '#34d399'];
 const palette = (name = '') => PALETTE[name.charCodeAt(0) % PALETTE.length];
@@ -26,6 +29,9 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
 
   const fileInputRef = useRef(null);
   const [pushFolder, setPushFolder] = useState(null); // folder data for modal
+  const [compareFile, setCompareFile] = useState(null);
+  const [forkSource, setForkSource] = useState(null); // sheet to fork from
+  const [mergeSource, setMergeSource] = useState(null); // forked sheet to merge into its parent
 
   // Load project list
   useEffect(() => {
@@ -88,6 +94,38 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
     const result = await window.electron.selectFolder();
     if (result) setPushFolder(result);
   };
+
+  const handleForkDone = async (created) => {
+    setForkSource(null);
+    if (!selected) return;
+    try {
+      const refreshed = await api.getProjectBySlug(user.username, selected.slug);
+      setSelected(refreshed);
+      setActiveSheet(created.id);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleMergeDone = async (result) => {
+    const targetSheetId = result?.parentSheetId || mergeSource?.parentSheetId;
+    setMergeSource(null);
+    if (!selected) return;
+    try {
+      const refreshed = await api.getProjectBySlug(user.username, selected.slug);
+      setSelected(refreshed);
+      if (targetSheetId) setActiveSheet(targetSheetId);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const isOwner = !!(selected?.owner && user && selected.owner.id === user.id);
+
+  const activeSheetSummary = useMemo(
+    () => (selected?.sheets || []).find((s) => s.id === activeSheet) || null,
+    [selected, activeSheet]
+  );
 
   const confirmUpload = async () => {
     if (!pendingFile) return;
@@ -250,6 +288,10 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
               sheets={selected.sheets || []}
               activeSheet={activeSheet}
               onSelect={setActiveSheet}
+              onFork={activeSheetSummary ? () => setForkSource(activeSheetSummary) : null}
+              onMerge={activeSheetSummary?.parentSheetId
+                ? () => setMergeSource(activeSheetSummary)
+                : null}
             />
 
             {/* Content */}
@@ -280,7 +322,12 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
 
                   {/* Files */}
                   {(sheetDetail?.files || []).length > 0 && (
-                    <FileTable files={sheetDetail.files} baseUrl={baseUrl} token={token} />
+                    <FileTable
+                      files={sheetDetail.files}
+                      baseUrl={baseUrl}
+                      token={token}
+                      onCompare={setCompareFile}
+                    />
                   )}
                 </>
               )}
@@ -288,6 +335,39 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
           </>
         )}
       </div>
+
+      {/* ── Compare Versions modal ──────────────────────── */}
+      <CompareVersionsModal
+        open={!!compareFile}
+        onClose={() => setCompareFile(null)}
+        file={compareFile}
+        sheetId={activeSheet}
+        api={api}
+      />
+
+      {/* ── Fork Sheet modal ────────────────────────────── */}
+      {forkSource && selected && (
+        <ForkSheetModal
+          projectId={selected.id}
+          sourceSheet={forkSource}
+          api={api}
+          onClose={() => setForkSource(null)}
+          onDone={handleForkDone}
+        />
+      )}
+
+      {/* ── Merge Sheet modal ───────────────────────────── */}
+      {mergeSource && selected && (
+        <MergeSheetModal
+          projectId={selected.id}
+          forkSheet={mergeSource}
+          parentSheet={(selected.sheets || []).find((s) => s.id === mergeSource.parentSheetId) || null}
+          isOwner={isOwner}
+          api={api}
+          onClose={() => setMergeSource(null)}
+          onDone={handleMergeDone}
+        />
+      )}
 
       {/* ── Push Folder modal ───────────────────────────── */}
       {pushFolder && (
@@ -424,13 +504,14 @@ function ProjectBanner({ project }) {
   );
 }
 
-function SheetTabs({ sheets, activeSheet, onSelect }) {
+function SheetTabs({ sheets, activeSheet, onSelect, onFork, onMerge }) {
   if (sheets.length === 0) return null;
   return (
     <div className="flex items-center gap-1 px-6 py-2 border-b border-slate-800/60 shrink-0 overflow-x-auto"
       style={{ background: 'rgba(6,13,26,0.6)' }}>
       {sheets.map((sheet) => {
         const active = sheet.id === activeSheet;
+        const isFork = !!sheet.parentSheetId;
         return (
           <button
             key={sheet.id}
@@ -439,11 +520,16 @@ function SheetTabs({ sheets, activeSheet, onSelect }) {
             style={active
               ? { background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)' }
               : { color: '#475569', border: '1px solid transparent' }}
+            title={isFork ? 'Forked sheet' : undefined}
           >
-            <span
-              className="w-1.5 h-1.5 rounded-full shrink-0"
-              style={{ background: active ? '#60a5fa' : '#1e293b' }}
-            />
+            {isFork ? (
+              <BranchIcon className="w-3 h-3 shrink-0" color={active ? '#a78bfa' : '#475569'} />
+            ) : (
+              <span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ background: active ? '#60a5fa' : '#1e293b' }}
+              />
+            )}
             {sheet.name}
             {sheet.fileCount > 0 && (
               <span
@@ -456,7 +542,61 @@ function SheetTabs({ sheets, activeSheet, onSelect }) {
           </button>
         );
       })}
+
+      <div className="ml-auto flex items-center gap-1.5 shrink-0">
+        {onMerge && (
+          <button
+            onClick={onMerge}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap"
+            style={{
+              color: '#60a5fa',
+              border: '1px solid rgba(96,165,250,0.25)',
+              background: 'rgba(96,165,250,0.06)',
+            }}
+            title="Merge this fork back into its parent"
+          >
+            <MergeIcon className="w-3 h-3" color="#60a5fa" />
+            Merge
+          </button>
+        )}
+        {onFork && (
+          <button
+            onClick={onFork}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap"
+            style={{
+              color: '#a78bfa',
+              border: '1px solid rgba(167,139,250,0.25)',
+              background: 'rgba(167,139,250,0.06)',
+            }}
+            title="Fork the active sheet"
+          >
+            <BranchIcon className="w-3 h-3" color="#a78bfa" />
+            Fork
+          </button>
+        )}
+      </div>
     </div>
+  );
+}
+
+function BranchIcon({ className, color }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <line x1="6" y1="3" x2="6" y2="15" />
+      <circle cx="18" cy="6" r="3" />
+      <circle cx="6" cy="18" r="3" />
+      <path d="M18 9a9 9 0 0 1-9 9" />
+    </svg>
+  );
+}
+
+function MergeIcon({ className, color }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="18" cy="18" r="3" />
+      <circle cx="6" cy="6" r="3" />
+      <path d="M6 21V9a9 9 0 0 0 9 9" />
+    </svg>
   );
 }
 
@@ -523,7 +663,7 @@ function DropZone({ dragOver, uploading, fileError, onDragOver, onDragLeave, onD
   );
 }
 
-function FileTable({ files, baseUrl, token }) {
+function FileTable({ files, baseUrl, token, onCompare }) {
   return (
     <div>
       <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-600 mb-2">
@@ -551,6 +691,7 @@ function FileTable({ files, baseUrl, token }) {
             last={i === files.length - 1}
             baseUrl={baseUrl}
             token={token}
+            onCompare={() => onCompare(file)}
           />
         ))}
       </div>
@@ -558,7 +699,7 @@ function FileTable({ files, baseUrl, token }) {
   );
 }
 
-function FileRow({ file, last, baseUrl, token }) {
+function FileRow({ file, last, baseUrl, token, onCompare }) {
   const handleOpen = async () => {
     const url = `${baseUrl}/api/files/${file.id}/download`;
     try {
@@ -636,6 +777,15 @@ function FileRow({ file, last, baseUrl, token }) {
             title="Open in Photos"
           >
             ⊙
+          </button>
+        )}
+        {isImage && file.version > 1 && (
+          <button
+            onClick={onCompare}
+            className="w-5 text-center text-slate-700 hover:text-pink-400 text-sm"
+            title="Compare versions"
+          >
+            ⇄
           </button>
         )}
         <a
