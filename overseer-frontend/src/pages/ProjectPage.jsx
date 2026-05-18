@@ -3,6 +3,12 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getProjectBySlug, starProject, unstarProject } from '../api/projects';
 import { getSheet, createSheet, deleteSheet } from '../api/sheets';
+import {
+  getProjectMembers,
+  addProjectMember,
+  updateProjectMemberRole,
+  removeProjectMember,
+} from '../api/members';
 import LoadingPage from '../components/LoadingPage';
 import PageBanner from '../components/PageBanner';
 import ImageLightbox from '../components/ImageLightbox';
@@ -26,7 +32,11 @@ export default function ProjectPage() {
   const [previewFile, setPreviewFile] = useState(null);
   const [compareFile, setCompareFile] = useState(null);
 
-  const isOwner = user?.username === username;
+  // Authoritative role comes from the backend response; fall back to ownership-by-username
+  // so the UI doesn't look broken on a stale snapshot before the backfill runs.
+  const myRole = project?.myRole ?? (user?.username === username ? 'OWNER' : null);
+  const isOwner = myRole === 'OWNER';
+  const canEdit = myRole === 'OWNER' || myRole === 'EDITOR';
 
   useEffect(() => {
     setLoading(true);
@@ -183,7 +193,7 @@ export default function ProjectPage() {
                   <span className="font-semibold">{project.starCount}</span>
                 </button>
               )}
-              {isOwner && (
+              {canEdit && (
                 <Link
                   to={`/u/${username}/${slug}/edit`}
                   className="px-3 py-1.5 bg-slate-900/80 border border-slate-700 hover:border-slate-500 text-slate-300 text-sm rounded-xl transition-colors backdrop-blur-sm"
@@ -205,7 +215,7 @@ export default function ProjectPage() {
             <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: '#60a5fa' }}>
               Sheets
             </span>
-            {isOwner && (
+            {canEdit && (
               <button
                 onClick={() => setShowNewSheet(true)}
                 className="w-6 h-6 rounded-lg bg-slate-900 border border-slate-800 hover:border-blue-600/60 text-slate-500 hover:text-blue-400 flex items-center justify-center transition-all text-base leading-none"
@@ -248,7 +258,7 @@ export default function ProjectPage() {
                       {sheet.fileCount}
                     </span>
                   )}
-                  {isOwner && !sheet.isDefault && (
+                  {canEdit && !sheet.isDefault && (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDeleteSheet(sheet.id); }}
                       className="opacity-0 group-hover:opacity-100 text-slate-700 hover:text-red-400 text-xs transition-all ml-0.5"
@@ -288,7 +298,7 @@ export default function ProjectPage() {
 
           {sheets.length === 0 && !showNewSheet && (
             <p className="text-slate-700 text-xs mt-2 pl-1">
-              {isOwner ? 'No sheets yet.' : 'No sheets.'}
+              {canEdit ? 'No sheets yet.' : 'No sheets.'}
             </p>
           )}
         </div>
@@ -303,7 +313,7 @@ export default function ProjectPage() {
               >
                 ⊞
               </div>
-              {isOwner ? (
+              {canEdit ? (
                 <>
                   <p className="text-slate-400 font-medium mb-1">No sheets yet</p>
                   <p className="text-slate-600 text-sm mb-4">Create a sheet to start organizing files</p>
@@ -330,7 +340,7 @@ export default function ProjectPage() {
                     <p className="text-slate-500 text-sm mt-0.5">{sheetDetail.description}</p>
                   )}
                 </div>
-                {isOwner && (
+                {canEdit && (
                   <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 border border-slate-800 text-slate-500 text-xs rounded-xl">
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -351,7 +361,7 @@ export default function ProjectPage() {
                     </svg>
                   </div>
                   <p className="text-slate-600 text-sm">
-                    {isOwner ? 'Push files via the desktop app to get started.' : 'No files in this sheet.'}
+                    {canEdit ? 'Push files via the desktop app to get started.' : 'No files in this sheet.'}
                   </p>
                 </div>
               ) : (
@@ -405,6 +415,13 @@ export default function ProjectPage() {
         </div>
       )}
 
+      {/* ── Members (OWNER only) ────────────────────────────── */}
+      {isOwner && project && (
+        <div className="max-w-7xl mx-auto px-4 pb-12">
+          <MembersSection projectId={project.id} />
+        </div>
+      )}
+
       {/* ── Image Lightbox ──────────────────────────────────── */}
       <ImageLightbox
         open={!!previewFile}
@@ -425,6 +442,193 @@ export default function ProjectPage() {
         file={compareFile}
         sheetId={activeSheet}
       />
+    </div>
+  );
+}
+
+/* ── Members section ───────────────────────────────────── */
+
+const ROLE_COLORS = {
+  OWNER:  { color: '#f472b6', bg: 'rgba(244,114,182,0.10)', border: 'rgba(244,114,182,0.30)' },
+  EDITOR: { color: '#a78bfa', bg: 'rgba(167,139,250,0.10)', border: 'rgba(167,139,250,0.30)' },
+  VIEWER: { color: '#60a5fa', bg: 'rgba(96,165,250,0.10)',  border: 'rgba(96,165,250,0.30)'  },
+};
+
+function MembersSection({ projectId }) {
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [newUsername, setNewUsername] = useState('');
+  const [newRole, setNewRole] = useState('EDITOR');
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    getProjectMembers(projectId)
+      .then((list) => { if (!cancelled) setMembers(list); })
+      .catch((e) => { if (!cancelled) setError(e.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [projectId]);
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    const username = newUsername.trim();
+    if (!username) return;
+    setAdding(true);
+    setError('');
+    try {
+      const created = await addProjectMember(projectId, { username, role: newRole });
+      setMembers((m) => [...m, created]);
+      setNewUsername('');
+      setNewRole('EDITOR');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleRoleChange = async (userId, role) => {
+    setError('');
+    try {
+      const updated = await updateProjectMemberRole(projectId, userId, role);
+      setMembers((list) => list.map((m) => (m.user.id === userId ? updated : m)));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleRemove = async (userId, username) => {
+    if (!confirm(`Remove ${username} from this project?`)) return;
+    setError('');
+    try {
+      await removeProjectMember(projectId, userId);
+      setMembers((list) => list.filter((m) => m.user.id !== userId));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <div className="border border-slate-800/70 rounded-2xl overflow-hidden">
+      <div
+        className="flex items-center gap-2.5 px-5 py-3 border-b border-slate-800/60"
+        style={{ background: 'linear-gradient(90deg, rgba(244,114,182,0.07) 0%, transparent 60%)' }}
+      >
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#f472b6' }} />
+        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#f472b6' }}>
+          Members
+        </span>
+        <span className="text-slate-700 text-xs ml-auto">{members.length}</span>
+      </div>
+
+      <div className="p-5 space-y-4 bg-slate-950/40">
+        {/* Add member form */}
+        <form onSubmit={handleAdd} className="flex flex-wrap gap-2">
+          <input
+            type="text"
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.target.value)}
+            placeholder="Username"
+            className="flex-1 min-w-[180px] px-3 py-2 bg-slate-900 border border-slate-800 focus:border-blue-600 text-white text-sm rounded-xl placeholder:text-slate-700 focus:outline-none transition-colors"
+          />
+          <select
+            value={newRole}
+            onChange={(e) => setNewRole(e.target.value)}
+            className="px-3 py-2 bg-slate-900 border border-slate-800 text-white text-sm rounded-xl focus:outline-none focus:border-violet-600 transition-colors"
+          >
+            <option value="EDITOR">Editor</option>
+            <option value="VIEWER">Viewer</option>
+          </select>
+          <button
+            type="submit"
+            disabled={adding || !newUsername.trim()}
+            className="px-4 py-2 btn-primary text-sm rounded-xl font-semibold disabled:opacity-40"
+          >
+            {adding ? 'Adding…' : 'Add member'}
+          </button>
+        </form>
+
+        {error && <p className="text-red-400 text-xs">{error}</p>}
+
+        {/* Member list */}
+        {loading ? (
+          <div className="text-slate-700 text-sm animate-pulse">Loading members…</div>
+        ) : members.length === 0 ? (
+          <p className="text-slate-700 text-sm">No members yet.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {members.map((m) => (
+              <MemberRow
+                key={m.id}
+                member={m}
+                onRoleChange={(role) => handleRoleChange(m.user.id, role)}
+                onRemove={() => handleRemove(m.user.id, m.user.username)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MemberRow({ member, onRoleChange, onRemove }) {
+  const isOwner = member.role === 'OWNER';
+  const c = ROLE_COLORS[member.role] ?? ROLE_COLORS.VIEWER;
+  return (
+    <div className="group flex items-center gap-3 px-3 py-2 rounded-xl border border-slate-800/60 bg-slate-900/40 hover:bg-slate-900/70 transition-colors">
+      {member.user.avatarUrl ? (
+        <img
+          src={member.user.avatarUrl}
+          alt=""
+          referrerPolicy="no-referrer"
+          className="w-8 h-8 rounded-full ring-1 ring-slate-700/60 shrink-0"
+        />
+      ) : (
+        <div className="w-8 h-8 rounded-full shrink-0 avatar-gradient flex items-center justify-center text-white text-xs font-bold">
+          {(member.user.username || '?')[0].toUpperCase()}
+        </div>
+      )}
+
+      <div className="min-w-0 flex-1">
+        <p className="text-white text-sm font-medium truncate leading-tight">
+          {member.user.displayName || member.user.username}
+        </p>
+        <p className="text-slate-600 text-xs truncate">@{member.user.username}</p>
+      </div>
+
+      {isOwner ? (
+        <span
+          className="text-[11px] font-semibold uppercase tracking-widest px-2.5 py-1 rounded-lg border"
+          style={{ color: c.color, background: c.bg, borderColor: c.border }}
+        >
+          Owner
+        </span>
+      ) : (
+        <select
+          value={member.role}
+          onChange={(e) => onRoleChange(e.target.value)}
+          className="text-xs font-semibold uppercase tracking-widest px-2.5 py-1 rounded-lg border bg-transparent focus:outline-none"
+          style={{ color: c.color, background: c.bg, borderColor: c.border }}
+        >
+          <option value="EDITOR" style={{ color: '#0f172a' }}>Editor</option>
+          <option value="VIEWER" style={{ color: '#0f172a' }}>Viewer</option>
+        </select>
+      )}
+
+      {!isOwner && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-slate-700 hover:text-red-400 text-sm opacity-0 group-hover:opacity-100 transition-all px-2"
+          title="Remove member"
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 }

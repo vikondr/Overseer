@@ -28,7 +28,7 @@ export default function MergeSheetModal({
   projectId,
   forkSheet,
   parentSheet,
-  isOwner,
+  canMerge,
   api,
   onClose,
   onDone,
@@ -209,10 +209,10 @@ export default function MergeSheetModal({
                 </details>
               )}
 
-              {/* Owner gate notice */}
-              {!isOwner && (
+              {/* Role gate notice */}
+              {!canMerge && (
                 <p className="text-amber-300 text-xs bg-amber-900/15 border border-amber-700/30 rounded-xl px-3 py-2">
-                  Only the project owner can commit a merge. You can review the diff here, but the Merge button is disabled.
+                  You need EDITOR or OWNER access to commit a merge. You can review the diff here, but the Merge button is disabled.
                 </p>
               )}
 
@@ -224,7 +224,7 @@ export default function MergeSheetModal({
                 <input
                   value={commitMsg}
                   onChange={(e) => setCommitMsg(e.target.value)}
-                  disabled={committing || !isOwner}
+                  disabled={committing || !canMerge}
                   maxLength={500}
                   placeholder={`Merged from fork '${forkSheet.name}'`}
                   className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 text-white text-sm rounded-xl focus:outline-none focus:border-violet-500 placeholder:text-slate-700 transition-colors disabled:opacity-50"
@@ -251,7 +251,7 @@ export default function MergeSheetModal({
           </button>
           <button
             onClick={handleCommit}
-            disabled={committing || loading || !preview || actionableCount === 0 || !isOwner}
+            disabled={committing || loading || !preview || actionableCount === 0 || !canMerge}
             className="flex-1 py-2 btn-primary text-sm rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {committing ? (

@@ -57,7 +57,10 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
     setSheetDetail(null);
     setActiveSheet(null);
     try {
-      const full = await api.getProjectBySlug(user.username, proj.slug);
+      // The project's owner may differ from the logged-in user when this user
+      // is an EDITOR/VIEWER on someone else's project.
+      const ownerUsername = proj.owner?.username ?? user.username;
+      const full = await api.getProjectBySlug(ownerUsername, proj.slug);
       setSelected(full);
       const firstSheet = full.sheets?.[0];
       if (firstSheet) setActiveSheet(firstSheet.id);
@@ -120,7 +123,12 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
     }
   };
 
-  const isOwner = !!(selected?.owner && user && selected.owner.id === user.id);
+  // myRole now comes from the backend ProjectResponse; fall back to owner-id match
+  // so behavior degrades gracefully against an older backend.
+  const myRole = selected?.myRole
+    ?? (selected?.owner && user && selected.owner.id === user.id ? 'OWNER' : null);
+  const canEdit = myRole === 'OWNER' || myRole === 'EDITOR';
+  const canMerge = canEdit;
 
   const activeSheetSummary = useMemo(
     () => (selected?.sheets || []).find((s) => s.id === activeSheet) || null,
@@ -362,7 +370,7 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
           projectId={selected.id}
           forkSheet={mergeSource}
           parentSheet={(selected.sheets || []).find((s) => s.id === mergeSource.parentSheetId) || null}
-          isOwner={isOwner}
+          canMerge={canMerge}
           api={api}
           onClose={() => setMergeSource(null)}
           onDone={handleMergeDone}
