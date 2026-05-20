@@ -3,8 +3,11 @@ package com.overseer.service;
 import com.overseer.dto.Dtos.*;
 import com.overseer.exception.GlobalExceptionHandler.*;
 import com.overseer.model.Project;
+import com.overseer.model.ProjectMember;
+import com.overseer.model.ProjectMember.Role;
 import com.overseer.model.Sheet;
 import com.overseer.model.User;
+import com.overseer.repository.ProjectMemberRepository;
 import com.overseer.repository.ProjectRepository;
 import com.overseer.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +18,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,8 +29,10 @@ import java.util.stream.Collectors;
 public class ProjectService {
 
     private final ProjectRepository projectRepository;
+    private final ProjectMemberRepository memberRepository;
     private final UserRepository userRepository;
     private final UserService userService;
+    private final ProjectAccessService access;
 
     @Transactional
     public ProjectResponse createProject(String ownerId, CreateProjectRequest request) {
@@ -52,31 +60,39 @@ public class ProjectService {
         project.getSheets().add(mainSheet);
 
         Project saved = projectRepository.save(project);
-        return toResponse(saved);
+
+        // Mirror the owner into project_members so role checks have a single source.
+        memberRepository.save(ProjectMember.builder()
+            .project(saved)
+            .user(owner)
+            .role(Role.OWNER)
+            .build());
+
+        return toResponse(saved, ownerId);
     }
 
     public ProjectResponse getProjectById(String projectId, String requesterId) {
         Project project = projectRepository.findById(projectId)
             .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
-        checkReadAccess(project, requesterId);
-        return toResponse(project);
+        access.requireReadAccess(project, requesterId);
+        return toResponse(project, requesterId);
     }
 
     public ProjectResponse getProjectByOwnerAndSlug(String username, String slug, String requesterId) {
         Project project = projectRepository.findByOwnerUsernameAndSlug(username, slug)
             .orElseThrow(() -> new ResourceNotFoundException("Project not found: " + username + "/" + slug));
 
-        checkReadAccess(project, requesterId);
-        return toResponse(project);
+        access.requireReadAccess(project, requesterId);
+        return toResponse(project, requesterId);
     }
 
     @Transactional
-    public ProjectResponse updateProject(String projectId, String ownerId, UpdateProjectRequest request) {
+    public ProjectResponse updateProject(String projectId, String userId, UpdateProjectRequest request) {
         Project project = projectRepository.findById(projectId)
             .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
 
-        checkOwnership(project, ownerId);
+        access.requireRole(project, userId, Role.EDITOR);
 
         if (request.getName() != null) {
             project.setName(request.getName());
@@ -88,26 +104,51 @@ public class ProjectService {
         if (request.getLivePreviewUrl() != null) project.setLivePreviewUrl(request.getLivePreviewUrl());
         if (request.getTags() != null) project.setTags(request.getTags());
 
-        return toResponse(projectRepository.save(project));
+        return toResponse(projectRepository.save(project), userId);
     }
 
     @Transactional
-    public void deleteProject(String projectId, String ownerId) {
+    public void deleteProject(String projectId, String userId) {
         Project project = projectRepository.findById(projectId)
             .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
-        checkOwnership(project, ownerId);
+        access.requireRole(project, userId, Role.OWNER);
+
+        // project_members and user_starred_projects FKs have no ON DELETE CASCADE
+        // in legacy schemas (the @OnDelete annotation on ProjectMember only takes
+        // effect when DDL is regenerated). Clean them up explicitly so the delete
+        // succeeds against both fresh and pre-existing databases.
+        memberRepository.deleteByProjectId(projectId);
+        projectRepository.deleteStarsForProject(projectId);
+        projectRepository.flush();
+
         projectRepository.delete(project);
     }
 
     public List<ProjectSummary> getUserProjects(String username, String requesterId) {
-        User owner = userRepository.findByUsername(username)
+        User user = userRepository.findByUsername(username)
             .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
 
-        return projectRepository.findByOwnerId(owner.getId()).stream()
-            .filter(p -> p.getVisibility() == Project.Visibility.PUBLIC
-                         || owner.getId().equals(requesterId))
-            .map(this::toSummary)
-            .collect(Collectors.toList());
+        // Union of (a) projects this user owns and (b) projects they are a member of.
+        // Deduplicate by project id while preserving insertion order.
+        Map<String, Project> byId = new LinkedHashMap<>();
+        for (Project p : projectRepository.findByOwnerId(user.getId())) byId.put(p.getId(), p);
+        for (Project p : memberRepository.findProjectsByUserId(user.getId())) byId.putIfAbsent(p.getId(), p);
+
+        boolean self = user.getId().equals(requesterId);
+        List<Project> visible = new ArrayList<>();
+        for (Project p : byId.values()) {
+            if (p.getVisibility() == Project.Visibility.PUBLIC) {
+                visible.add(p);
+                continue;
+            }
+            // For private/unlisted, only show if the requester themselves has access.
+            if (requesterId != null && access.roleOf(p, requesterId) != null) {
+                visible.add(p);
+                continue;
+            }
+            if (self) visible.add(p);
+        }
+        return visible.stream().map(this::toSummary).collect(Collectors.toList());
     }
 
     // ── Explore & Search ────────────────────────────────────
@@ -165,23 +206,9 @@ public class ProjectService {
         }
     }
 
-    // ── Access control ──────────────────────────────────────
-
-    private void checkReadAccess(Project project, String requesterId) {
-        if (project.getVisibility() == Project.Visibility.PUBLIC) return;
-        if (project.getOwner().getId().equals(requesterId)) return;
-        throw new UnauthorizedException("You do not have access to this project");
-    }
-
-    private void checkOwnership(Project project, String userId) {
-        if (!project.getOwner().getId().equals(userId)) {
-            throw new UnauthorizedException("You are not the owner of this project");
-        }
-    }
-
     // ── Mapping ─────────────────────────────────────────────
 
-    public ProjectResponse toResponse(Project p) {
+    public ProjectResponse toResponse(Project p, String requesterId) {
         return ProjectResponse.builder()
             .id(p.getId())
             .name(p.getName())
@@ -199,11 +226,14 @@ public class ProjectService {
                 .id(s.getId())
                 .name(s.getName())
                 .isDefault(s.isDefault())
+                .parentSheetId(s.getParentSheet() != null ? s.getParentSheet().getId() : null)
+                .createdBy(s.getCreatedBy() != null ? userService.toSummary(s.getCreatedBy()) : null)
                 .fileCount(s.getFiles() != null ? s.getFiles().size() : 0)
                 .build()
             ).collect(Collectors.toList()))
             .createdAt(p.getCreatedAt())
             .updatedAt(p.getUpdatedAt())
+            .myRole(access.roleOf(p, requesterId))
             .build();
     }
 

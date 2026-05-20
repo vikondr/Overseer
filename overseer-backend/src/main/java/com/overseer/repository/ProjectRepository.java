@@ -34,4 +34,15 @@ public interface ProjectRepository extends JpaRepository<Project, String> {
 
     @Query("SELECT p FROM Project p WHERE p.owner.id = :ownerId OR p.visibility = 'PUBLIC'")
     Page<Project> findAccessibleProjects(@Param("ownerId") String ownerId, Pageable pageable);
+
+    /**
+     * Erase every user's "star" on the given project before the project row is removed.
+     * The join table {@code user_starred_projects} is owned by {@link com.overseer.model.User},
+     * so JPA cascades from Project do not touch it — without this cleanup,
+     * {@code projectRepository.delete(project)} fails on the FK constraint.
+     */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query(value = "DELETE FROM user_starred_projects WHERE project_id = :projectId",
+           nativeQuery = true)
+    int deleteStarsForProject(@Param("projectId") String projectId);
 }

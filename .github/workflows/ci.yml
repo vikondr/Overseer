@@ -9,7 +9,7 @@ on:
 jobs:
   # ── Frontend ────────────────────────────────────────────────
   frontend:
-    name: Frontend — lint & build
+    name: Frontend — lint, test & build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -26,11 +26,12 @@ jobs:
 
       - run: npm ci
       - run: npm run lint
+      - run: npm test
       - run: npm run build
 
   # ── Backend ─────────────────────────────────────────────────
   backend:
-    name: Backend — compile
+    name: Backend — unit + E2E tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -45,13 +46,15 @@ jobs:
           distribution: temurin
           cache: maven
 
-      # Skip tests — the only test (contextLoads) requires a live PostgreSQL instance
       - run: chmod +x mvnw
-      - run: ./mvnw --batch-mode package -DskipTests
+      # Tests boot against an in-memory H2 database (configured via
+      # @E2ETestSupport on each E2E test class), so no postgres service is
+      # required in CI. Unit tests use Mockito and need no infrastructure.
+      - run: ./mvnw --batch-mode verify
 
   # ── Pixel Diff ──────────────────────────────────────────────
   pixeldiff:
-    name: Pixel Diff — install & check
+    name: Pixel Diff — install & pytest
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -64,7 +67,8 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: overseer-pixeldiff/requirements.txt
+          cache-dependency-path: overseer-pixeldiff/requirements-dev.txt
 
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements-dev.txt
       - run: python -m py_compile main.py
+      - run: pytest -v

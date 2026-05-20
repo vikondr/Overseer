@@ -85,9 +85,9 @@
 
         <!-- File handling -->
         <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>s3</artifactId>
-            <version>2.28.0</version>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-storage-blob</artifactId>
+            <version>12.27.1</version>
         </dependency>
 
         <!-- Utilities -->
@@ -111,6 +111,13 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- HttpClient5 — needed by TestRestTemplate to support PATCH requests
+             (the JDK HttpURLConnection restricts the method set) -->
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
