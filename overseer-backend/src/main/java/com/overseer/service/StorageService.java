@@ -1,13 +1,19 @@
 package com.overseer.service;
 
+import com.azure.storage.blob.BlobContainerClient;
+import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.overseer.dto.Dtos.*;
 import com.overseer.exception.GlobalExceptionHandler.*;
+import com.overseer.model.Project;
 import com.overseer.model.ProjectFile;
+import com.overseer.model.ProjectMember.Role;
 import com.overseer.model.Sheet;
 import com.overseer.model.User;
 import com.overseer.repository.ProjectFileRepository;
+import com.overseer.repository.ProjectRepository;
 import com.overseer.repository.SheetRepository;
 import com.overseer.repository.UserRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -33,9 +40,11 @@ import java.util.stream.Collectors;
 public class StorageService {
 
     private final ProjectFileRepository fileRepository;
+    private final ProjectRepository projectRepository;
     private final SheetRepository sheetRepository;
     private final UserRepository userRepository;
     private final UserService userService;
+    private final ProjectAccessService access;
 
     @Value("${overseer.storage.type:local}")
     private String storageType;
@@ -43,15 +52,33 @@ public class StorageService {
     @Value("${overseer.storage.local-path:./uploads}")
     private String localPath;
 
+    @Value("${overseer.storage.azure.connection-string:}")
+    private String azureConnectionString;
+
+    @Value("${overseer.storage.azure.container:overseer-files}")
+    private String azureContainer;
+
+    private BlobContainerClient blobContainerClient;
+
+    @PostConstruct
+    void init() {
+        if ("azure".equals(storageType)) {
+            blobContainerClient = new BlobServiceClientBuilder()
+                    .connectionString(azureConnectionString)
+                    .buildClient()
+                    .getBlobContainerClient(azureContainer);
+            blobContainerClient.createIfNotExists();
+            log.info("Azure Blob Storage initialised — container: {}", azureContainer);
+        }
+    }
+
     @Transactional
     public FileResponse uploadFile(String sheetId, String userId,
                                    MultipartFile file, String commitMessage) throws IOException {
         Sheet sheet = sheetRepository.findById(sheetId)
             .orElseThrow(() -> new ResourceNotFoundException("Sheet not found"));
 
-        if (!sheet.getProject().getOwner().getId().equals(userId)) {
-            throw new UnauthorizedException("Only the project owner can upload files");
-        }
+        access.requireRole(sheet.getProject(), userId, Role.EDITOR);
 
         User uploader = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
@@ -80,6 +107,14 @@ public class StorageService {
             .build();
 
         ProjectFile saved = fileRepository.save(projectFile);
+
+        // Set thumbnail on the project when it's the first image uploaded
+        Project project = sheet.getProject();
+        if (project.getThumbnailUrl() == null && file.getContentType() != null
+                && file.getContentType().startsWith("image/")) {
+            project.setThumbnailUrl("/api/files/" + saved.getId() + "/download");
+            projectRepository.save(project);
+        }
 
         return FileResponse.builder()
             .id(saved.getId())
@@ -129,17 +164,24 @@ public class StorageService {
             ).collect(Collectors.toList());
     }
 
-    public byte[] downloadFile(String fileId) throws IOException {
+    public record DownloadResult(byte[] data, String mimeType, String fileName) {}
+
+    public DownloadResult downloadFile(String fileId) throws IOException {
         ProjectFile pf = fileRepository.findById(fileId)
             .orElseThrow(() -> new ResourceNotFoundException("File not found"));
 
+        byte[] data;
         if ("local".equals(storageType)) {
-            Path filePath = Paths.get(localPath, pf.getStorageKey());
-            return Files.readAllBytes(filePath);
+            data = Files.readAllBytes(Paths.get(localPath, pf.getStorageKey()));
+        } else if ("azure".equals(storageType)) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            blobContainerClient.getBlobClient(pf.getStorageKey()).downloadStream(out);
+            data = out.toByteArray();
+        } else {
+            throw new UnsupportedOperationException("Unsupported storage type: " + storageType);
         }
 
-        // TODO: implement S3 download
-        throw new UnsupportedOperationException("S3 storage not yet implemented");
+        return new DownloadResult(data, pf.getMimeType(), pf.getFileName());
     }
 
     /**
@@ -175,8 +217,14 @@ public class StorageService {
             return key;
         }
 
-        // TODO: implement S3 upload
-        throw new UnsupportedOperationException("S3 storage not yet implemented");
+        if ("azure".equals(storageType)) {
+            String key = projectId + "/" + sheetId + "/" + UUID.randomUUID() + "_" + file.getOriginalFilename();
+            blobContainerClient.getBlobClient(key)
+                    .upload(file.getInputStream(), file.getSize(), true);
+            return key;
+        }
+
+        throw new UnsupportedOperationException("Unsupported storage type: " + storageType);
     }
 
     private String computeSha256(byte[] data) {

@@ -39,11 +39,21 @@ public class SecurityConfig {
                 // Public endpoints
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/projects/explore/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/projects/search/**").permitAll()
+
+                // Public read endpoints. Services that touch private resources still
+                // call ProjectAccessService.requireReadAccess internally, so listing
+                // these as permitAll only relaxes the authentication gate — not authz.
+                .requestMatchers(HttpMethod.GET, "/api/projects/explore").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/projects/search").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/projects/tag/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/projects/{id}").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/projects/by/{username}/{slug}").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/projects/user/{username}").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/projects/*/sheets").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/projects/*/sheets/*").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/users/search").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/users/{username}").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/users/{username}/projects").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/files/*/download").permitAll()
                 .requestMatchers("/api-docs/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
 

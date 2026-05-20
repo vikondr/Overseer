@@ -1,5 +1,6 @@
 package com.overseer.controller;
 
+import com.overseer.dto.Dtos;
 import com.overseer.dto.Dtos.*;
 import com.overseer.model.User;
 import com.overseer.service.UserService;
@@ -16,6 +17,14 @@ public class UserController {
 
     private final UserService userService;
 
+    @GetMapping("/search")
+    public ResponseEntity<Dtos.PageResponse<Dtos.UserSummary>> searchUsers(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(userService.searchUsers(q, page, size));
+    }
+
     @GetMapping("/{username}")
     public ResponseEntity<UserResponse> getUserByUsername(@PathVariable String username) {
         return ResponseEntity.ok(userService.getUserByUsername(username));
@@ -26,6 +35,13 @@ public class UserController {
             @AuthenticationPrincipal User user,
             @Valid @RequestBody UpdateUserRequest request) {
         return ResponseEntity.ok(userService.updateProfile(user.getId(), request));
+    }
+
+    @GetMapping("/{username}/follow")
+    public ResponseEntity<Boolean> isFollowing(
+            @AuthenticationPrincipal User user,
+            @PathVariable String username) {
+        return ResponseEntity.ok(userService.isFollowing(user.getId(), username));
     }
 
     @PostMapping("/{username}/follow")

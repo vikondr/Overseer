@@ -43,11 +43,17 @@ public class FileController {
 
     @GetMapping("/files/{fileId}/download")
     public ResponseEntity<byte[]> downloadFile(@PathVariable String fileId) throws IOException {
-        byte[] data = storageService.downloadFile(fileId);
+        StorageService.DownloadResult result = storageService.downloadFile(fileId);
+        MediaType mediaType = result.mimeType() != null
+            ? MediaType.parseMediaType(result.mimeType())
+            : MediaType.APPLICATION_OCTET_STREAM;
+        String disposition = (result.mimeType() != null && result.mimeType().startsWith("image/"))
+            ? "inline"
+            : "attachment; filename=\"" + result.fileName() + "\"";
         return ResponseEntity.ok()
-            .contentType(MediaType.APPLICATION_OCTET_STREAM)
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment")
-            .body(data);
+            .contentType(mediaType)
+            .header(HttpHeaders.CONTENT_DISPOSITION, disposition)
+            .body(result.data());
     }
 
     @GetMapping("/files/diff")

@@ -1,7 +1,10 @@
 package com.overseer.dto;
 
 import com.overseer.model.Project;
+import com.overseer.model.ProjectMember;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
@@ -47,6 +50,9 @@ public class Dtos {
 
     @Data
     public static class UpdateUserRequest {
+        @Pattern(regexp = "^[a-zA-Z0-9_-]{3,30}$",
+                 message = "Username must be 3–30 characters and contain only letters, numbers, hyphens, or underscores")
+        private String username;
         @Size(max = 50) private String displayName;
         @Size(max = 500) private String bio;
         @Size(max = 100) private String location;
@@ -102,6 +108,31 @@ public class Dtos {
         private List<SheetSummary> sheets;
         private Instant createdAt;
         private Instant updatedAt;
+        /** Role of the requesting user in this project; null when the requester is not a member. */
+        private ProjectMember.Role myRole;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // PROJECT MEMBERS
+    // ═══════════════════════════════════════════════════════════
+
+    @Data @Builder
+    public static class ProjectMemberResponse {
+        private String id;
+        private UserSummary user;
+        private ProjectMember.Role role;
+        private Instant addedAt;
+    }
+
+    @Data
+    public static class AddMemberRequest {
+        @NotBlank private String username;
+        @NotNull  private ProjectMember.Role role;
+    }
+
+    @Data
+    public static class UpdateMemberRoleRequest {
+        @NotNull private ProjectMember.Role role;
     }
 
     @Data @Builder
@@ -129,6 +160,12 @@ public class Dtos {
         private String parentSheetId;
     }
 
+    @Data
+    public static class ForkSheetRequest {
+        @NotBlank @Size(max = 100) private String name;
+        @Size(max = 500) private String description;
+    }
+
     @Data @Builder
     public static class SheetResponse {
         private String id;
@@ -136,6 +173,7 @@ public class Dtos {
         private String description;
         private boolean isDefault;
         private String parentSheetId;
+        private UserSummary createdBy;
         private List<FileResponse> files;
         private Instant createdAt;
         private Instant updatedAt;
@@ -146,7 +184,52 @@ public class Dtos {
         private String id;
         private String name;
         private boolean isDefault;
+        private String parentSheetId;
+        private UserSummary createdBy;
         private int fileCount;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // MERGE
+    // ═══════════════════════════════════════════════════════════
+
+    public enum ConflictKind { UNCHANGED, MODIFIED_IN_BOTH, ONLY_IN_FORK, ONLY_IN_PARENT }
+    public enum Resolution   { TAKE_FORK, TAKE_PARENT }
+
+    @Data @Builder
+    public static class FileConflict {
+        private String fileName;
+        private ConflictKind kind;
+        private FileResponse forkFile;     // null when ONLY_IN_PARENT
+        private FileResponse parentFile;   // null when ONLY_IN_FORK
+    }
+
+    @Data @Builder
+    public static class MergePreviewResponse {
+        private String forkSheetId;
+        private String parentSheetId;
+        private List<FileConflict> files;
+    }
+
+    @Data
+    public static class FileResolution {
+        @NotBlank private String fileName;
+        @NotNull  private Resolution resolution;
+    }
+
+    @Data
+    public static class MergeCommitRequest {
+        @NotNull private List<FileResolution> resolutions;
+        @Size(max = 500) private String commitMessage;
+    }
+
+    @Data @Builder
+    public static class MergeCommitResponse {
+        private String parentSheetId;
+        private int filesUpdated;
+        private int filesAdded;
+        private int filesDeleted;
+        private int filesSkipped;
     }
 
     // ═══════════════════════════════════════════════════════════

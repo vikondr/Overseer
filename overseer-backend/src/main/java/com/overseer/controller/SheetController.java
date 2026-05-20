@@ -28,16 +28,48 @@ public class SheetController {
             .body(sheetService.createSheet(projectId, user.getId(), request));
     }
 
+    @PostMapping("/{sheetId}/fork")
+    public ResponseEntity<SheetResponse> forkSheet(
+            @PathVariable String projectId,
+            @PathVariable String sheetId,
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody ForkSheetRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(sheetService.forkSheet(projectId, sheetId, user.getId(), request));
+    }
+
+    @GetMapping("/{sheetId}/merge/preview")
+    public ResponseEntity<MergePreviewResponse> previewMerge(
+            @PathVariable String projectId,
+            @PathVariable String sheetId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(sheetService.previewMerge(sheetId, user.getId()));
+    }
+
+    @PostMapping("/{sheetId}/merge")
+    public ResponseEntity<MergeCommitResponse> commitMerge(
+            @PathVariable String projectId,
+            @PathVariable String sheetId,
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody MergeCommitRequest request) {
+        return ResponseEntity.ok(sheetService.commitMerge(sheetId, user.getId(), request));
+    }
+
     @GetMapping
-    public ResponseEntity<List<SheetSummary>> getSheets(@PathVariable String projectId) {
-        return ResponseEntity.ok(sheetService.getProjectSheets(projectId));
+    public ResponseEntity<List<SheetSummary>> getSheets(
+            @PathVariable String projectId,
+            @AuthenticationPrincipal User user) {
+        String requesterId = user != null ? user.getId() : null;
+        return ResponseEntity.ok(sheetService.getProjectSheets(projectId, requesterId));
     }
 
     @GetMapping("/{sheetId}")
     public ResponseEntity<SheetResponse> getSheet(
             @PathVariable String projectId,
-            @PathVariable String sheetId) {
-        return ResponseEntity.ok(sheetService.getSheet(sheetId));
+            @PathVariable String sheetId,
+            @AuthenticationPrincipal User user) {
+        String requesterId = user != null ? user.getId() : null;
+        return ResponseEntity.ok(sheetService.getSheet(sheetId, requesterId));
     }
 
     @DeleteMapping("/{sheetId}")

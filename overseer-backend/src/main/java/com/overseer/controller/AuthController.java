@@ -21,7 +21,7 @@ public class AuthController {
      */
     @GetMapping("/me")
     public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(userService.toResponse(user));
+        return ResponseEntity.ok(userService.getUserById(user.getId()));
     }
 
     /**

@@ -3,6 +3,8 @@ package com.overseer.model;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
@@ -34,12 +36,17 @@ public class Sheet {
     // ── Parent reference (for forked sheets) ────────────────
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_sheet_id")
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private Sheet parentSheet;
 
     // ── Relationships ───────────────────────────────────────
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", nullable = false)
     private Project project;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by")
+    private User createdBy;
 
     @OneToMany(mappedBy = "sheet", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

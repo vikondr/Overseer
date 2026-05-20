@@ -1,12 +1,18 @@
 package com.overseer.service;
 
+import com.overseer.dto.Dtos;
 import com.overseer.dto.Dtos.*;
-import com.overseer.exception.GlobalExceptionHandler.*;
+import com.overseer.exception.GlobalExceptionHandler.DuplicateResourceException;
+import com.overseer.exception.GlobalExceptionHandler.ResourceNotFoundException;
 import com.overseer.model.User;
 import com.overseer.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +39,12 @@ public class UserService {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
+        if (request.getUsername() != null && !request.getUsername().equals(user.getUsername())) {
+            if (userRepository.existsByUsername(request.getUsername())) {
+                throw new DuplicateResourceException("Username already taken: " + request.getUsername());
+            }
+            user.setUsername(request.getUsername());
+        }
         if (request.getDisplayName() != null) user.setDisplayName(request.getDisplayName());
         if (request.getBio() != null) user.setBio(request.getBio());
         if (request.getLocation() != null) user.setLocation(request.getLocation());
@@ -41,6 +53,26 @@ public class UserService {
         if (request.getSkills() != null) user.setSkills(request.getSkills());
 
         return toResponse(userRepository.save(user));
+    }
+
+    @Transactional(readOnly = true)
+    public Dtos.PageResponse<Dtos.UserSummary> searchUsers(String query, int page, int size) {
+        Page<User> users = userRepository.searchUsers(query, PageRequest.of(page, size));
+        return Dtos.PageResponse.<Dtos.UserSummary>builder()
+            .content(users.getContent().stream().map(this::toSummary).collect(Collectors.toList()))
+            .page(users.getNumber())
+            .size(users.getSize())
+            .totalElements(users.getTotalElements())
+            .totalPages(users.getTotalPages())
+            .last(users.isLast())
+            .build();
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isFollowing(String followerId, String targetUsername) {
+        User target = userRepository.findByUsername(targetUsername)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + targetUsername));
+        return target.getFollowers().stream().anyMatch(f -> f.getId().equals(followerId));
     }
 
     @Transactional
