@@ -9,6 +9,12 @@ const SORTS = [
   { value: 'recent', label: 'Recently updated',   color: '#a78bfa' },
 ];
 
+const FILTERS = [
+  { value: 'all',      label: 'All',      color: '#cbd5e1' },
+  { value: 'projects', label: 'Projects', color: '#60a5fa' },
+  { value: 'people',   label: 'People',   color: '#a78bfa' },
+];
+
 export default function ExplorePage() {
   const [projects, setProjects]       = useState([]);
   const [users, setUsers]             = useState([]);
@@ -16,6 +22,7 @@ export default function ExplorePage() {
   const [error, setError]             = useState(null);
   const [query, setQuery]             = useState('');
   const [sort, setSort]               = useState('stars');
+  const [filter, setFilter]           = useState('all');
   const [page, setPage]               = useState(0);
   const [totalPages, setTotalPages]   = useState(0);
   const [searchInput, setSearchInput] = useState('');
@@ -25,9 +32,17 @@ export default function ExplorePage() {
     setLoading(true);
     setError(null);
 
-    const reqs = query
-      ? [searchProjects(query, page), searchUsers(query)]
-      : [exploreProjects(page, 20, sort), Promise.resolve({ content: [] })];
+    let reqs;
+    if (query) {
+      const wantProjects = filter === 'all' || filter === 'projects';
+      const wantPeople   = filter === 'all' || filter === 'people';
+      reqs = [
+        wantProjects ? searchProjects(query, page) : Promise.resolve({ content: [], totalPages: 0 }),
+        wantPeople   ? searchUsers(query)          : Promise.resolve({ content: [] }),
+      ];
+    } else {
+      reqs = [exploreProjects(page, 20, sort), Promise.resolve({ content: [] })];
+    }
 
     Promise.all(reqs)
       .then(([projData, userData]) => {
@@ -41,7 +56,7 @@ export default function ExplorePage() {
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, [query, sort, page]);
+  }, [query, sort, filter, page]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -52,6 +67,7 @@ export default function ExplorePage() {
   const clearSearch = () => {
     setQuery('');
     setSearchInput('');
+    setFilter('all');
     setPage(0);
   };
 
@@ -98,16 +114,32 @@ export default function ExplorePage() {
         {/* Controls / active query label */}
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
           {query ? (
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400 text-sm">
-                Results for <span className="text-white">&ldquo;{query}&rdquo;</span>
-              </span>
-              <button
-                onClick={clearSearch}
-                className="text-slate-500 hover:text-slate-300 text-xs border border-slate-700 rounded-full px-2 py-0.5 transition-colors"
-              >
-                Clear ✕
-              </button>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400 text-sm">
+                  Results for <span className="text-white">&ldquo;{query}&rdquo;</span>
+                </span>
+                <button
+                  onClick={clearSearch}
+                  className="text-slate-500 hover:text-slate-300 text-xs border border-slate-700 rounded-full px-2 py-0.5 transition-colors"
+                >
+                  Clear ✕
+                </button>
+              </div>
+              <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1">
+                {FILTERS.map((f) => (
+                  <button
+                    key={f.value}
+                    onClick={() => { setFilter(f.value); setPage(0); }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                    style={filter === f.value
+                      ? { background: `${f.color}18`, color: f.color, border: `1px solid ${f.color}35` }
+                      : { color: '#64748b', border: '1px solid transparent' }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1">
@@ -142,8 +174,8 @@ export default function ExplorePage() {
           </div>
         ) : (
           <>
-            {/* People section — only shown when searching */}
-            {query && users.length > 0 && (
+            {/* People section — only shown when searching and filter allows people */}
+            {query && (filter === 'all' || filter === 'people') && users.length > 0 && (
               <section className="mb-10">
                 <h2 className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: '#a78bfa' }}>
                   People · {users.length}
@@ -155,17 +187,17 @@ export default function ExplorePage() {
             )}
 
             {/* Projects section */}
-            {query && (
+            {query && (filter === 'all' || filter === 'projects') && (
               <h2 className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: '#60a5fa' }}>
                 Projects · {projects.length}
               </h2>
             )}
 
-            {projects.length === 0 && (!query || users.length === 0) ? (
+            {projects.length === 0 && users.length === 0 ? (
               <div className="flex items-center justify-center py-24 text-slate-600">
                 {query ? 'No results found.' : 'No projects yet.'}
               </div>
-            ) : projects.length > 0 ? (
+            ) : projects.length > 0 && (filter !== 'people' || !query) ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {projects.map((p) => <ProjectCard key={p.id} project={p} />)}

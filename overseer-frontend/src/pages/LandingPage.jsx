@@ -67,14 +67,6 @@ export default function LandingPage() {
 
         {/* Content */}
         <div className="relative z-10 text-center max-w-5xl mx-auto w-full">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2.5 px-4 py-1.5 bg-slate-900/80 border border-slate-700/60 rounded-full text-slate-400 text-xs mb-10 tracking-wide backdrop-blur-sm">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-            </span>
-            Open platform · Version control for creatives
-          </div>
 
           {/* Headline */}
           <h1 className="font-black tracking-tighter leading-[0.86] mb-8"
@@ -226,7 +218,7 @@ export default function LandingPage() {
           {[
             { value: '∞', label: 'Version history', color: '#60a5fa' },
             { value: '100%', label: 'Free to use', color: '#34d399' },
-            { value: '0', label: 'Credit cards', color: '#f472b6' },
+            { value: 'MAX', label: 'Flexibility', color: '#f472b6' },
           ].map(({ value, label, color }) => (
             <div key={label} className="group">
               <p
@@ -335,23 +327,75 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Large — Open */}
+            {/* Large — Fork & Merge */}
             <div className="md:col-span-2 relative p-8 bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden group hover:border-pink-800/60 transition-all duration-300">
               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
                 style={{ background: 'radial-gradient(ellipse at 20% 80%, rgba(236,72,153,0.06) 0%, transparent 60%)' }} />
 
-              <div className="text-pink-400 font-mono text-2xl mb-3 select-none">⟡</div>
-              <h3 className="text-white font-bold text-xl mb-2">Open & Free Forever</h3>
+              <div className="text-pink-400 font-mono text-2xl mb-3 select-none">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 inline-block">
+                  <line x1="6" y1="3" x2="6" y2="15" />
+                  <circle cx="18" cy="6" r="3" />
+                  <circle cx="6" cy="18" r="3" />
+                  <path d="M18 9a9 9 0 0 1-9 9" />
+                </svg>
+              </div>
+              <h3 className="text-white font-bold text-xl mb-2">Fork, Iterate, Merge</h3>
               <p className="text-slate-400 text-sm leading-relaxed max-w-sm">
-                No paywalls, no premium tiers, no credit card required. Overseer is free for everyone — built on open principles.
+                Branch a sheet to explore a direction without disturbing the original. When you're ready, merge back with a visual, file-by-file conflict review powered by perceptual diff.
               </p>
 
-              <div className="mt-6 pt-5 border-t border-slate-800/60 flex flex-wrap gap-2">
-                {['No credit card', 'Unlimited projects', 'Community-driven', 'Open platform', 'Always free'].map((label) => (
-                  <span key={label} className="px-3 py-1 bg-slate-800/60 border border-slate-700/50 rounded-full text-slate-400 text-xs hover:border-slate-600 transition-colors">
-                    {label}
-                  </span>
-                ))}
+              <div className="mt-6 pt-5 border-t border-slate-800/60 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Parent sheet */}
+                <div className="rounded-xl border border-slate-800/70 bg-slate-950/40 p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                    <span className="text-blue-300 text-xs font-semibold">Main</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="font-mono text-slate-500 truncate">hero.png</span>
+                      <span className="ml-auto text-slate-700 font-mono">v2</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="font-mono text-slate-500 truncate">card.svg</span>
+                      <span className="ml-auto text-slate-700 font-mono">v1</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fork */}
+                <div className="rounded-xl border border-violet-800/40 bg-violet-950/10 p-3 relative">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+                      <line x1="6" y1="3" x2="6" y2="15" />
+                      <circle cx="18" cy="6" r="3" />
+                      <circle cx="6" cy="18" r="3" />
+                      <path d="M18 9a9 9 0 0 1-9 9" />
+                    </svg>
+                    <span className="text-violet-300 text-xs font-semibold">Dark variant</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="font-mono text-slate-300 truncate">hero.png</span>
+                      <span
+                        className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded-md"
+                        style={{ background: 'rgba(167,139,250,0.15)', color: '#c4b5fd' }}
+                      >
+                        SSIM 71%
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="font-mono text-slate-300 truncate">card.svg</span>
+                      <span
+                        className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded-md"
+                        style={{ background: 'rgba(52,211,153,0.12)', color: '#6ee7b7' }}
+                      >
+                        unchanged
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -420,7 +464,7 @@ export default function LandingPage() {
       <footer className="border-t border-slate-900/80 py-10 px-4">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <span className="text-slate-300 font-bold text-sm tracking-tight">Overseer</span>
-          <p className="text-slate-700 text-xs text-center">Version control for creative work.</p>
+          <p className="text-slate-700 text-xs text-center">Keep creating, you can always take a step back.</p>
           <p className="text-slate-700 text-xs">© 2025</p>
         </div>
       </footer>

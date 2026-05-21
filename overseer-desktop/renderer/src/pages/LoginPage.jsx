@@ -1,9 +1,12 @@
 import { useState } from 'react';
 
+const DEFAULT_URL = 'http://localhost:8080';
+
 export default function LoginPage({ onConnect }) {
-  const [url, setUrl] = useState('http://localhost:8080');
+  const [url, setUrl] = useState(DEFAULT_URL);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const handleGoogle = async () => {
     setError('');
@@ -71,19 +74,6 @@ export default function LoginPage({ onConnect }) {
             style={{ background: 'radial-gradient(circle at 100% 0%, rgba(167,139,250,0.1) 0%, transparent 70%)' }} />
 
           <div className="space-y-4">
-            <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">
-                Server URL
-              </label>
-              <input
-                type="text"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 text-white text-sm rounded-xl focus:outline-none focus:border-blue-500 placeholder:text-slate-700 transition-colors font-mono"
-                placeholder="http://localhost:8080"
-              />
-            </div>
-
             {error && (
               <p className="text-red-400 text-xs bg-red-900/20 border border-red-800/40 rounded-lg px-3 py-2">
                 {error}
@@ -98,6 +88,29 @@ export default function LoginPage({ onConnect }) {
               <GoogleIcon />
               {loading ? 'Opening…' : 'Sign in with Google'}
             </button>
+
+            {showAdvanced ? (
+              <div className="pt-1">
+                <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">
+                  Server URL
+                </label>
+                <input
+                  type="text"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 text-white text-sm rounded-xl focus:outline-none focus:border-blue-500 placeholder:text-slate-700 transition-colors font-mono"
+                  placeholder={DEFAULT_URL}
+                />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(true)}
+                className="block mx-auto text-[11px] text-slate-600 hover:text-slate-400 transition-colors"
+              >
+                Advanced options
+              </button>
+            )}
           </div>
         </div>
 

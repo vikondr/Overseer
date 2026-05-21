@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { getProjectBySlug, updateProject } from '../api/projects';
 import TagPicker from '../components/TagPicker';
 import VisibilityPicker from '../components/VisibilityPicker';
@@ -9,7 +8,6 @@ import AlertBanner from '../components/AlertBanner';
 
 export default function EditProjectPage() {
   const { username, slug } = useParams();
-  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [project, setProject] = useState(null);
@@ -30,7 +28,8 @@ export default function EditProjectPage() {
   useEffect(() => {
     getProjectBySlug(username, slug)
       .then((p) => {
-        if (user?.username !== username) {
+        const canEdit = p.myRole === 'OWNER' || p.myRole === 'EDITOR';
+        if (!canEdit) {
           navigate(`/u/${username}/${slug}`);
           return;
         }
@@ -46,7 +45,7 @@ export default function EditProjectPage() {
       })
       .catch(() => navigate('/404'))
       .finally(() => setLoading(false));
-  }, [username, slug, user, navigate]);
+  }, [username, slug, navigate]);
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 

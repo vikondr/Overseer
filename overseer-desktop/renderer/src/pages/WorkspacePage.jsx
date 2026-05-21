@@ -4,6 +4,7 @@ import PushFolderModal from './PushFolderModal';
 import CompareVersionsModal from './CompareVersionsModal';
 import ForkSheetModal from './ForkSheetModal';
 import MergeSheetModal from './MergeSheetModal';
+import MembersModal from './MembersModal';
 
 const PALETTE = ['#60a5fa', '#a78bfa', '#f472b6', '#34d399'];
 const palette = (name = '') => PALETTE[name.charCodeAt(0) % PALETTE.length];
@@ -32,6 +33,7 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
   const [compareFile, setCompareFile] = useState(null);
   const [forkSource, setForkSource] = useState(null); // sheet to fork from
   const [mergeSource, setMergeSource] = useState(null); // forked sheet to merge into its parent
+  const [showMembers, setShowMembers] = useState(false);
 
   // Load project list
   useEffect(() => {
@@ -102,7 +104,8 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
     setForkSource(null);
     if (!selected) return;
     try {
-      const refreshed = await api.getProjectBySlug(user.username, selected.slug);
+      const ownerUsername = selected.owner?.username ?? user.username;
+      const refreshed = await api.getProjectBySlug(ownerUsername, selected.slug);
       setSelected(refreshed);
       setActiveSheet(created.id);
     } catch (e) {
@@ -115,7 +118,8 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
     setMergeSource(null);
     if (!selected) return;
     try {
-      const refreshed = await api.getProjectBySlug(user.username, selected.slug);
+      const ownerUsername = selected.owner?.username ?? user.username;
+      const refreshed = await api.getProjectBySlug(ownerUsername, selected.slug);
       setSelected(refreshed);
       if (targetSheetId) setActiveSheet(targetSheetId);
     } catch (e) {
@@ -129,6 +133,9 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
     ?? (selected?.owner && user && selected.owner.id === user.id ? 'OWNER' : null);
   const canEdit = myRole === 'OWNER' || myRole === 'EDITOR';
   const canMerge = canEdit;
+  // PUBLIC projects: anyone signed in can fork. PRIVATE/UNLISTED: EDITOR+ only.
+  // Mirrors SheetService.forkSheet — keeps the UI affordances honest about what the API will accept.
+  const canFork = !!user && (selected?.visibility === 'PUBLIC' || canEdit);
 
   const activeSheetSummary = useMemo(
     () => (selected?.sheets || []).find((s) => s.id === activeSheet) || null,
@@ -289,15 +296,19 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
         ) : (
           <>
             {/* Project banner */}
-            <ProjectBanner project={selected} />
+            <ProjectBanner
+              project={selected}
+              myRole={myRole}
+              onShowMembers={() => setShowMembers(true)}
+            />
 
             {/* Sheet tabs */}
             <SheetTabs
               sheets={selected.sheets || []}
               activeSheet={activeSheet}
               onSelect={setActiveSheet}
-              onFork={activeSheetSummary ? () => setForkSource(activeSheetSummary) : null}
-              onMerge={activeSheetSummary?.parentSheetId
+              onFork={activeSheetSummary && canFork ? () => setForkSource(activeSheetSummary) : null}
+              onMerge={activeSheetSummary?.parentSheetId && canMerge
                 ? () => setMergeSource(activeSheetSummary)
                 : null}
             />
@@ -310,23 +321,29 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
                 <div className="text-slate-600 text-sm animate-pulse">Loading…</div>
               ) : (
                 <>
-                  {/* Drop zone */}
-                  <DropZone
-                    dragOver={dragOver}
-                    uploading={uploading}
-                    fileError={fileError}
-                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={handleDrop}
-                    onClick={() => fileInputRef.current?.click()}
-                  />
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    accept={ALLOWED.map((e) => `.${e}`).join(',')}
-                    onChange={handleFileInput}
-                  />
+                  {/* Drop zone — only for EDITOR+ */}
+                  {canEdit ? (
+                    <>
+                      <DropZone
+                        dragOver={dragOver}
+                        uploading={uploading}
+                        fileError={fileError}
+                        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                        onDragLeave={() => setDragOver(false)}
+                        onDrop={handleDrop}
+                        onClick={() => fileInputRef.current?.click()}
+                      />
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        accept={ALLOWED.map((e) => `.${e}`).join(',')}
+                        onChange={handleFileInput}
+                      />
+                    </>
+                  ) : (
+                    <ReadOnlyBanner role={myRole} />
+                  )}
 
                   {/* Files */}
                   {(sheetDetail?.files || []).length > 0 && (
@@ -374,6 +391,16 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
           api={api}
           onClose={() => setMergeSource(null)}
           onDone={handleMergeDone}
+        />
+      )}
+
+      {/* ── Members modal ───────────────────────────────── */}
+      {showMembers && selected && (
+        <MembersModal
+          projectId={selected.id}
+          isOwner={myRole === 'OWNER'}
+          api={api}
+          onClose={() => setShowMembers(false)}
         />
       )}
 
@@ -470,8 +497,15 @@ function EmptyState() {
   );
 }
 
-function ProjectBanner({ project }) {
+const BANNER_ROLE_COLORS = {
+  OWNER:  { color: '#f472b6', bg: 'rgba(244,114,182,0.10)', border: 'rgba(244,114,182,0.30)' },
+  EDITOR: { color: '#a78bfa', bg: 'rgba(167,139,250,0.10)', border: 'rgba(167,139,250,0.30)' },
+  VIEWER: { color: '#60a5fa', bg: 'rgba(96,165,250,0.10)',  border: 'rgba(96,165,250,0.30)'  },
+};
+
+function ProjectBanner({ project, myRole, onShowMembers }) {
   const color = palette(project.name);
+  const roleStyle = myRole ? BANNER_ROLE_COLORS[myRole] : null;
   return (
     <div className="relative px-6 py-5 border-b border-slate-800/60 shrink-0 overflow-hidden">
       {/* Blobs */}
@@ -485,28 +519,79 @@ function ProjectBanner({ project }) {
           backgroundSize: '24px 24px', opacity: 0.35,
         }} />
       </div>
-      <div className="relative">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />
-          <h2 className="text-lg font-black text-white tracking-tight">{project.name}</h2>
-          {project.starCount > 0 && (
-            <span className="flex items-center gap-1 text-xs text-yellow-400 ml-1">
-              <span>★</span>{project.starCount}
-            </span>
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />
+            <h2 className="text-lg font-black text-white tracking-tight">{project.name}</h2>
+            {roleStyle && (
+              <span
+                className="text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-md border"
+                style={{ color: roleStyle.color, background: roleStyle.bg, borderColor: roleStyle.border }}
+              >
+                {myRole.toLowerCase()}
+              </span>
+            )}
+            {project.starCount > 0 && (
+              <span className="flex items-center gap-1 text-xs text-yellow-400 ml-1">
+                <span>★</span>{project.starCount}
+              </span>
+            )}
+          </div>
+          {project.description && (
+            <p className="text-slate-500 text-xs leading-relaxed mb-2 max-w-lg">{project.description}</p>
+          )}
+          {(project.tags || []).length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {project.tags.map((tag) => (
+                <span key={tag} className="px-2 py-0.5 bg-slate-800/60 border border-slate-700/40 text-slate-500 text-[10px] rounded-full">
+                  {tag}
+                </span>
+              ))}
+            </div>
           )}
         </div>
-        {project.description && (
-          <p className="text-slate-500 text-xs leading-relaxed mb-2 max-w-lg">{project.description}</p>
+        {myRole && (
+          <button
+            onClick={onShowMembers}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+            style={{
+              color: '#f472b6',
+              border: '1px solid rgba(244,114,182,0.25)',
+              background: 'rgba(244,114,182,0.06)',
+            }}
+            title="Project members"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            Members
+          </button>
         )}
-        {(project.tags || []).length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {project.tags.map((tag) => (
-              <span key={tag} className="px-2 py-0.5 bg-slate-800/60 border border-slate-700/40 text-slate-500 text-[10px] rounded-full">
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
+      </div>
+    </div>
+  );
+}
+
+function ReadOnlyBanner({ role }) {
+  const cfg = role && BANNER_ROLE_COLORS[role];
+  return (
+    <div
+      className="mb-5 flex items-center gap-3 px-4 py-3 rounded-2xl border"
+      style={cfg
+        ? { borderColor: cfg.border, background: cfg.bg, color: cfg.color }
+        : { borderColor: 'rgba(51,65,85,0.6)', background: 'rgba(15,23,42,0.6)', color: '#94a3b8' }}
+    >
+      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+      <div className="text-xs leading-snug">
+        {role
+          ? <>Read-only — you have <span className="font-semibold uppercase">{role.toLowerCase()}</span> access. Ask the owner to promote you to EDITOR to push commits.</>
+          : <>Read-only — you are not a member of this project.</>}
       </div>
     </div>
   );

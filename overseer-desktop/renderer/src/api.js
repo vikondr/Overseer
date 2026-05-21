@@ -26,6 +26,19 @@ export function createApi(baseUrl, token) {
       return r.json();
     });
 
+  const patch = (path, body) =>
+    fetch(`${baseUrl}${path}`, { method: 'PATCH', headers: h, body: JSON.stringify(body) }).then((r) => {
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      return r.json();
+    });
+
+  const del = (path) =>
+    fetch(`${baseUrl}${path}`, { method: 'DELETE', headers: h }).then((r) => {
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      if (r.status === 204) return null;
+      return r.json().catch(() => null);
+    });
+
   return {
     getMe: () => get('/api/auth/me'),
     getProjects: (username) => get(`/api/projects/user/${username}`),
@@ -43,6 +56,13 @@ export function createApi(baseUrl, token) {
       get(`/api/projects/${projectId}/sheets/${sheetId}/merge/preview`),
     commitMerge: (projectId, sheetId, data) =>
       post(`/api/projects/${projectId}/sheets/${sheetId}/merge`, data),
+
+    listMembers: (projectId) => get(`/api/projects/${projectId}/members`),
+    addMember: (projectId, data) => post(`/api/projects/${projectId}/members`, data),
+    updateMemberRole: (projectId, userId, role) =>
+      patch(`/api/projects/${projectId}/members/${userId}`, { role }),
+    removeMember: (projectId, userId) =>
+      del(`/api/projects/${projectId}/members/${userId}`),
 
     uploadFile: (sheetId, file, commitMessage) => {
       const fd = new FormData();
