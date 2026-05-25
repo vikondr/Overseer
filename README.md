@@ -1,151 +1,109 @@
-# Overseer
-<p align='center'>
-  <img src="https://img.shields.io/badge/Java-%23ED8B00.svg?logo=openjdk&logoColor=white">
-  <img alt="" src="https://img.shields.io/badge/Spring%20Boot-6DB33F?logo=springboot&logoColor=white">
-  <img src="https://img.shields.io/badge/Maven-C71A36?logo=apachemaven&logoColor=white">
-  <img src="https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black">
-  <img src="https://img.shields.io/badge/Tailwind%20CSS-06B6D4?logo=tailwindcss&logoColor=white">
-  <img src="https://img.shields.io/badge/Electron-47848F?logo=electron&logoColor=white">
-  <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white">
-  <img src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white">
-  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white">
-</p>
+# 📘 Overseer
 
----
-A version control system and social network for designers — manage, store, and publish design projects with a visually appealing interface. Designers can track project history, collaborate, and explore work from others in a comfortable, structured environment.
+> *Колаборативна система контролю версіювання та соціальна платформа для дизайнерських проєктів.*
+> Дозволяє зберігати історію змін, порівнювати версії візуальних артефактів за допомогою перцептуального діффу (SSIM) та публікувати роботи у спільноті.
 
 ---
 
-## Architecture
+## 👤 Автор
 
-Overseer is composed of four services orchestrated with Docker Compose:
+- **ПІБ**: Кондрацька Вікторія Юріївна
+- **Група**: ФеП-42с
+- **Керівник**: асистент Мисюк Ірина Володимирівна
+- **Дата виконання**: 31.05.2026
 
-| Service | Tech | Port | Purpose |
-|---|---|---|---|
-| `overseer-backend` | Spring Boot (Java 21) | 8080 | REST API, auth, database |
-| `overseer-frontend` | React + Vite + Tailwind | 5173 | Web client |
-| `overseer-desktop` | Electron + React | — | Desktop app for pushing commits |
-| `overseer-pixeldiff` | FastAPI + Python | 8001 | SSIM-based pixel diff microservice |
+---
 
-**Storage:** PostgreSQL (via JPA) + Azurite (Azure Blob Storage emulator for local dev)
+## 📌 Загальна інформація
 
-**Auth:** Google OAuth2 → JWT
+- **Тип проєкту**: Багатосервісний веб- та десктоп-застосунок (мікросервісна архітектура)
+- **Мови програмування**: Java 21, JavaScript (React + Electron), Python 3.11
+- **Фреймворки / Бібліотеки**: Spring Boot, React + Vite, Tailwind CSS, Electron, FastAPI, scikit-image, JPA/Hibernate
+- **Інфраструктура**: Docker Compose, PostgreSQL, Azurite (емулятор Azure Blob Storage), Google OAuth2 + JWT
+- **CI**: GitHub Actions (паралельні задачі для frontend, backend, pixeldiff)
 
-```mermaid
-graph TD
-    subgraph Client
-        FE["overseer-frontend\nReact + Vite · :5173"]
-        DE["overseer-desktop\nElectron + React"]
-    end
+---
 
-    subgraph Services
-        BE["overseer-backend\nSpring Boot · :8080"]
-        PD["overseer-pixeldiff\nFastAPI · :8001"]
-    end
+## 🧠 Опис функціоналу
 
-    subgraph Storage
-        PG[(PostgreSQL\n:5432)]
-        AZ[(Azurite\nBlob Storage · :10000)]
-    end
+- 🔐 Авторизація через Google OAuth2 з видачею JWT-токенів
+- 🗂️ Створення, редагування та публікація дизайн-проєктів з тегами, README та налаштуваннями видимості
+- 📑 Версіонування файлів, організованих у листи (sheets) у межах проєкту
+- 🖼️ **Pixel diff** — мікросервіс на FastAPI, що порівнює зображення за метрикою SSIM та генерує візуалізацію розбіжностей
+- 💻 Десктоп-клієнт (Electron) для git-style push коммітів з локальної файлової системи
+- 🌐 Web-клієнт (read-only для коммітів) — Dashboard, Explore, Profile, Project, Settings
+- 👥 Соціальні функції — підписка на інших дизайнерів, перегляд їх проєктів
+- 💾 Зберігання файлів у Azure Blob Storage (локально — Azurite), метаданих — у PostgreSQL
+- 📦 Повне розгортання через Docker Compose
 
-    subgraph Auth
-        GO["Google OAuth2"]
-    end
+---
 
-    FE -- "REST /api/**" --> BE
-    FE -- "POST /diff" --> PD
-    DE -- "REST /api/**\npush commits" --> BE
-    DE -- "blob upload" --> AZ
-    BE -- "JPA" --> PG
-    BE -- "blob read/write" --> AZ
-    BE -- "OAuth2 redirect" --> GO
-    GO -- "callback + JWT" --> BE
+## 🧱 Опис основних класів / файлів
+
+| Файл / Модуль                                            | Призначення                                                |
+|----------------------------------------------------------|------------------------------------------------------------|
+| `docker-compose.yml`                                     | Оркеструє всі чотири сервіси + PostgreSQL + Azurite        |
+| `overseer-backend/`                                      | Spring Boot REST API (Java 21)                             |
+| `overseer-backend/.../controller/AuthController.java`    | OAuth2/JWT авторизація, `/api/auth/me`, `/api/auth/verify` |
+| `overseer-backend/.../controller/ProjectController.java` | CRUD проєктів, Explore, пошук                              |
+| `overseer-backend/.../controller/SheetController.java`   | Управління листами (sheets) проєкту                        |
+| `overseer-backend/.../controller/FileController.java`    | Завантаження файлів у Azure Blob Storage                   |
+| `overseer-backend/.../controller/UserController.java`    | Профілі користувачів, follow/unfollow                      |
+| `overseer-frontend/`                                     | React + Vite SPA                                           |
+| `overseer-frontend/src/pages/ProjectPage.jsx`            | Сторінка проєкту з модалом порівняння версій (pixel diff)  |
+| `overseer-frontend/src/pages/ExplorePage.jsx`            | Перегляд публічних проєктів                                |
+| `overseer-desktop/`                                      | Electron-клієнт для пушу коммітів                          |
+| `overseer-pixeldiff/main.py`                             | FastAPI-мікросервіс SSIM-діффу зображень                   |
+
+---
+
+## ▶️ Як запустити проєкт "з нуля"
+
+### 1. Встановлення інструментів
+
+- **Docker** + Docker Compose (рекомендований шлях)
+- Для локальної розробки поза Docker: **Node.js 20+**, **JDK 21**, **Python 3.11+**, **Maven 3.9+**
+
+### 2. Клонування репозиторію
+
+```bash
+git clone https://github.com/vikondr/Overseer.git
+cd Overseer
 ```
 
----
-
-## Project structure
-
-```
-Overseer/
-├── overseer-backend/      # Spring Boot · REST API, auth, Postgres, Azure blob
-├── overseer-frontend/     # React + Vite · web client (read-only for commits)
-├── overseer-desktop/      # Electron + React · commit pushes
-├── overseer-pixeldiff/    # FastAPI · SSIM perceptual diff microservice
-├── docker-compose.yml     # Orchestrates all four services + Postgres + Azurite
-├── .env.docker.example    # Template for Docker env vars
-└── .github/workflows/     # CI: lint + build for all services
-```
-
----
-
-## Features
-
-- **Google OAuth2 + JWT authentication** — secure sign-in, protected routes, auth callback flow
-- **Projects** — create, edit, and publish design projects with tags, visibility settings, and README
-- **Sheets & files** — version-controlled file uploads organized into sheets per project
-- **Profile** — editable Identity / Links / Skills sections, tag picker for skills, follow/unfollow users
-- **Explore** — browse public projects from all users
-- **Dashboard** — welcome banner with quick access to your recent projects
-- **Pixel diff** — FastAPI microservice using SSIM perceptual diff to compare image versions
-- **Desktop app** — Electron client dedicated to pushing project commits (web client is read-only for commits)
-- **GitHub Actions CI** — three parallel jobs: frontend lint+build, backend compile, pixeldiff syntax check
-
-### Design system
-Consistent color palette applied site-wide: blue `#60a5fa` · violet `#a78bfa` · pink `#f472b6` · green `#34d399`
-
-### User path
-
-```mermaid
-journey
-    title Overseer — User Flow
-    section Discovery
-      Visit landing page:        5: Visitor
-      Browse Explore page:       4: Visitor
-      View a public project:     4: Visitor
-    section Onboarding
-      Sign in with Google:       5: User
-      Redirected to Dashboard:   5: User
-    section Creating
-      Create a new project:      5: User
-      Add tags and visibility:   4: User
-      Push files via Desktop app: 4: User
-    section Collaborating
-      View another user profile: 5: User
-      Follow a designer:         5: User
-      Explore their projects:    4: User
-    section Managing
-      Edit project details:      4: User
-      Update profile / skills:   4: User
-      Compare versions (diff):   3: User
-```
-
----
-
-## Getting started
-
-### Prerequisites
-
-- **Docker** + Docker Compose (recommended path)
-- For local dev outside Docker: **Node 20+**, **JDK 21**, **Python 3.11+**, **Maven 3.9+**
-
-### Run with Docker Compose
+### 3. Створення `.env` файлу
 
 ```bash
 cp .env.docker.example .env
-# edit .env: fill in GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET
+```
+
+Заповніть значення:
+
+```
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+JWT_SECRET=at-least-32-random-characters
+FRONTEND_URL=http://localhost
+```
+
+> Облікові дані Google OAuth створюються тут: https://console.cloud.google.com/apis/credentials
+> Authorized redirect URI має містити `http://localhost/login/oauth2/code/google`.
+
+### 4. Запуск через Docker Compose
+
+```bash
 docker compose up --build
 ```
 
-Services come up at:
+Сервіси стануть доступними за адресами:
 
-- Frontend: http://localhost:5173
-- Backend:  http://localhost:8080 (Swagger at `/swagger-ui.html`)
-- Pixel diff: http://localhost:8001
-- Postgres: `localhost:5432` (user `overseer`, db `overseer`)
-- Azurite:  http://localhost:10000
+- **Frontend**: http://localhost:5173
+- **Backend**: http://localhost:8080 (Swagger UI: `/swagger-ui.html`)
+- **Pixel diff**: http://localhost:8001
+- **PostgreSQL**: `localhost:5432` (user `overseer`, db `overseer`)
+- **Azurite**: http://localhost:10000
 
-### Run services individually (dev mode)
+### 5. Запуск сервісів окремо (режим розробки)
 
 ```bash
 # Backend (Spring Boot)
@@ -157,31 +115,158 @@ cd overseer-frontend && npm install && npm run dev
 # Pixel diff (FastAPI)
 cd overseer-pixeldiff && pip install -r requirements.txt && uvicorn main:app --reload --port 8001
 
-# Desktop app (Electron + Vite)
+# Desktop (Electron + Vite)
 cd overseer-desktop && npm install && npm start
 ```
 
-The frontend dev server proxies `/api` → backend `:8080` and `/pixeldiff` → pixel diff `:8001`, so no CORS config is needed locally.
-
-### Environment variables
-
-See `.env.docker.example` for the full list. The minimum to boot the backend:
-
-| Variable | Purpose |
-|---|---|
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth2 credentials |
-| `JWT_SECRET` | ≥32-char random string used to sign JWTs |
-| `FRONTEND_URL` | Origin used for the OAuth2 redirect back to the SPA |
+Vite-проксі сам перенаправляє `/api` → backend `:8080` та `/pixeldiff` → pixel diff `:8001`, тому CORS-конфігурація локально не потрібна.
 
 ---
 
-## Changelog
+## 🔌 API приклади
 
-| Version | Date       | Changes                                                                                                                                                                                                                                                                                                              |
-|---------|------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 0.1.0   | 2026-03-18 | Spring Boot backend (Java 21) with Google OAuth2 + JWT auth, REST endpoints for users/projects/sheets/files, PostgreSQL via JPA, Swagger UI with Bearer token support, Docker Compose with PostgreSQL service, React + Vite frontend scaffold, Electron desktop scaffold                                             |
-| 0.1.1   | 2026-04-04 | React + Tailwind frontend, Azurite for local blob storage                                                                                                                                                                                                                                                            |
-| 0.1.2   | 2026-04-07 | Full authentication flow (Google OAuth2 callback, JWT context, protected routes), all main pages (Landing, Dashboard, Explore, Profile, Project, NewProject, Settings, NotFound), API client layer, ProjectCard component, Navbar                                                                                    |
-| 0.1.3   | 2026-04-08 | FastAPI pixel diff microservice (SSIM) in `overseer-pixeldiff/` on port 8001, EditProject page, TagPicker component, Settings page with Identity/Links/Skills sections, profile page overhaul, consistent color palette, fixed Google avatar loading (`referrerPolicy="no-referrer"`)                                |
-| 0.1.4   | 2026-04-19 | Expanded frontend pages (ProjectPage, NewProjectPage, NotFoundPage), desktop app pages (Login, Workspace, PushFolderModal), Electron IPC for git-style pushes, reusable components (Modal, PageBanner, Section, Field, AlertBanner, VisibilityPicker), GitHub Actions CI                                             |
-| 0.1.5   | 2026-04-26 | Image lightbox preview on web ProjectPage, "Compare versions" pixel-diff modal (web + desktop) calling the FastAPI SSIM service, web upload UI removed (commits are now desktop-only), README rendered as sanitized markdown via marked + DOMPurify, expanded README with project structure and getting-started docs |
+### 🔐 Авторизація
+
+Логін відбувається через OAuth2-редирект:
+
+```
+GET /oauth2/authorization/google
+```
+
+Після успішного логіну backend перенаправляє на `FRONTEND_URL/auth/callback?token=<JWT>`.
+
+**GET /api/auth/me**
+
+Повертає профіль поточного авторизованого користувача (потребує `Authorization: Bearer <JWT>`).
+
+```json
+{
+  "id": "u_abc123",
+  "username": "vikondr",
+  "displayName": "Victoria Kondratska",
+  "avatarUrl": "https://...",
+  "skills": ["illustration", "ui"]
+}
+```
+
+---
+
+### 📁 Проєкти
+
+**POST /api/projects**
+
+```json
+{
+  "name": "Concept Art Vol.1",
+  "slug": "concept-art-vol-1",
+  "visibility": "PUBLIC",
+  "tags": ["illustration", "fantasy"]
+}
+```
+
+**GET /api/projects/by/{username}/{slug}** — отримати проєкт за іменем користувача і слагом.
+
+**GET /api/projects/explore?page=0&size=20** — стрічка публічних проєктів.
+
+**PATCH /api/projects/{id}** — оновити метадані проєкту.
+
+**DELETE /api/projects/{id}** — видалити проєкт.
+
+---
+
+### 🖼️ Pixel diff (SSIM)
+
+**POST /diff** (мікросервіс на `:8001`, `multipart/form-data`)
+
+| Поле | Тип | Опис |
+|---|---|---|
+| `image_a` | file | Перша версія зображення |
+| `image_b` | file | Друга версія зображення |
+
+**Response:**
+
+```json
+{
+  "score": 0.987342,
+  "width": 1920,
+  "height": 1080,
+  "diff_image": "<base64-encoded PNG>"
+}
+```
+
+- `score` — SSIM у діапазоні `0..1` (1 = ідентичні зображення)
+- `diff_image` — PNG, на якому змінені пікселі підсвічено палітрою blue → violet → pink за інтенсивністю розбіжності
+
+**GET /health** — перевірка живості сервісу.
+
+---
+
+## 🖱️ Інструкція для користувача
+
+1. **Лендинг** — короткий опис системи та кнопка `🔐 Sign in with Google`.
+
+2. **Після авторизації**:
+   - 🏠 **Dashboard** — вітання та швидкий доступ до останніх проєктів
+   - 🌐 **Explore** — перегляд публічних проєктів інших дизайнерів
+   - 👤 **Profile** — редагування секцій Identity / Links / Skills, follow/unfollow
+   - ➕ **New Project** — створення нового проєкту з тегами та налаштуваннями видимості
+
+3. **Робота з проєктом (web)**:
+   - 📂 Перегляд листів (sheets) і файлів
+   - 🔍 Кліком на зображення відкривається lightbox
+   - 🆚 Кнопка `Compare versions` відкриває pixel-diff модал (SSIM-порівняння двох версій)
+   - ✏️ `Edit project` — редагування метаданих, README, тегів
+   - 🗑️ `Delete project` — видалення проєкту
+
+4. **Робота з проєктом (desktop)**:
+   - 💻 Запуск Electron-клієнта, логін через Google
+   - 📁 Вибір локальної папки і пуш файлів у проєкт (`Push folder…`)
+   - 🆚 Порівняння версій безпосередньо з робочого простору
+
+5. **Завершення сесії** — кнопка `🚪 Logout`.
+
+---
+
+## 📷 Скриншоти
+
+### Лендинг
+![Лендинг](screenshots/01_landing.png)
+
+### Dashboard
+![Dashboard](screenshots/02_dashboard.png)
+
+### Сторінка проєкту (web)
+![Сторінка проєкту — web](screenshots/03_projectPage_web.png)
+
+### Сторінка проєкту (desktop)
+![Сторінка проєкту — desktop](screenshots/04_projectPage_desktop.png)
+
+### Pixel diff — модал порівняння версій
+![Pixel diff modal](screenshots/05_pixelDiffModal.png)
+
+---
+
+## 🧪 Проблеми і рішення
+
+| Проблема                                             | Рішення                                                                                                      |
+|------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
+| Backend не стартує: `connection refused` до Postgres | Дочекатись healthcheck Postgres; перевірити, що порт `5432` не зайнятий                                      |
+| OAuth2 редиректить на 404                            | Перевірити `Authorized redirect URI` у Google Console — має бути `http://localhost/login/oauth2/code/google` |
+| `JWT signature does not match`                       | `JWT_SECRET` змінився між запусками — токени з минулої сесії невалідні                                       |
+| Завантажені файли не зберігаються                    | Перевірити, що контейнер `azurite` працює і доступний за `azurite:10000` всередині мережі Docker             |
+| Pixel diff повертає 400                              | Файл не є валідним зображенням, або сервіс не може його прочитати через PIL                                  |
+| Аватарка Google не вантажиться                       | Має використовуватись `referrerPolicy="no-referrer"` на `<img>` (вже застосовано)                            |
+
+---
+
+## 🧾 Використані джерела / література
+
+- Spring Boot Reference Documentation — https://docs.spring.io/spring-boot/
+- React Documentation — https://react.dev
+- Vite Guide — https://vitejs.dev/guide/
+- Electron Documentation — https://www.electronjs.org/docs/latest
+- FastAPI Documentation — https://fastapi.tiangolo.com
+- scikit-image: `structural_similarity` — https://scikit-image.org/docs/stable/api/skimage.metrics.html
+- Wang Z., Bovik A. C., Sheikh H. R., Simoncelli E. P. *Image Quality Assessment: From Error Visibility to Structural Similarity*. IEEE TIP, 2004.
+- PostgreSQL Documentation — https://www.postgresql.org/docs/
+- Docker Compose — https://docs.docker.com/compose/
