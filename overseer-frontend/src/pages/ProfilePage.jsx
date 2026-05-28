@@ -2,17 +2,20 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getUser, isFollowingUser, followUser, unfollowUser } from '../api/users';
-import { getUserProjects, deleteProject } from '../api/projects';
+import { getUserProjects, getStarredProjects } from '../api/projects';
 import ProjectCard from '../components/ProjectCard';
 import LoadingPage from '../components/LoadingPage';
+import Markdown from '../components/Markdown';
 
 const SKILL_COLORS = ['#60a5fa', '#a78bfa', '#f472b6', '#34d399'];
 
 function greeting() {
   const h = new Date().getHours();
+  if (h < 5)  return 'Burning the midnight oil';
   if (h < 12) return 'Good morning';
   if (h < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (h < 22) return 'Good evening';
+  return 'Good night';
 }
 
 export default function ProfilePage() {
@@ -20,6 +23,7 @@ export default function ProfilePage() {
   const { user: me } = useAuth();
   const [profile, setProfile]     = useState(null);
   const [projects, setProjects]   = useState([]);
+  const [starred, setStarred]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
@@ -28,12 +32,17 @@ export default function ProfilePage() {
 
   useEffect(() => {
     setLoading(true);
-    const requests = [getUser(username), getUserProjects(username)];
+    const requests = [
+      getUser(username),
+      getUserProjects(username),
+      getStarredProjects(username).catch(() => []),
+    ];
     if (me && me.username !== username) requests.push(isFollowingUser(username));
     Promise.all(requests)
-      .then(([p, projs, followingStatus]) => {
+      .then(([p, projs, starredProjs, followingStatus]) => {
         setProfile(p);
         setProjects(projs);
+        setStarred(starredProjs || []);
         if (followingStatus !== undefined) setFollowing(followingStatus);
       })
       .catch(console.error)
@@ -57,16 +66,6 @@ export default function ProfilePage() {
       alert(e.message);
     } finally {
       setFollowLoading(false);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this project? This cannot be undone.')) return;
-    try {
-      await deleteProject(id);
-      setProjects((ps) => ps.filter((p) => p.id !== id));
-    } catch (e) {
-      alert(e.message);
     }
   };
 
@@ -153,14 +152,6 @@ export default function ProfilePage() {
             <p className="text-slate-500 text-sm mt-0.5">@{profile.username}</p>
           </div>
 
-          {isOwn && (
-            <Link
-              to="/projects/new"
-              className="px-4 py-2 btn-primary rounded-lg text-sm font-semibold shrink-0 mt-1"
-            >
-              + New Project
-            </Link>
-          )}
         </div>
 
         {/* Bio */}
@@ -193,9 +184,11 @@ export default function ProfilePage() {
         {/* Stats */}
         <div className="flex items-center gap-1 mt-4 flex-wrap">
           {[
-            { value: profile.followerCount ?? 0,               label: 'followers', color: '#60a5fa' },
-            { value: profile.followingCount ?? 0,              label: 'following',  color: '#a78bfa' },
-            { value: profile.projectCount ?? projects.length,  label: 'projects',   color: '#34d399' },
+            { value: profile.followerCount ?? 0,  label: 'followers', color: '#60a5fa' },
+            { value: profile.followingCount ?? 0, label: 'following', color: '#a78bfa' },
+            // Use the visible list length so the count always matches what's rendered below
+            // (and self-heals after a project is deleted on the desktop).
+            { value: projects.length,             label: 'projects',  color: '#34d399' },
           ].map(({ value, label, color }, i) => (
             <div key={label} className="flex items-center">
               {i > 0 && <span className="text-slate-800 mx-2 select-none">·</span>}
@@ -225,6 +218,24 @@ export default function ProfilePage() {
           </div>
         )}
 
+        {/* ── README ──────────────────────────────────────── */}
+        {profile.readmeContent && (
+          <div className="mt-8 border border-slate-800/70 rounded-2xl overflow-hidden">
+            <div
+              className="flex items-center gap-2.5 px-5 py-3 border-b border-slate-800/60"
+              style={{ background: 'linear-gradient(90deg, rgba(96,165,250,0.07) 0%, transparent 60%)' }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+              <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#60a5fa' }}>
+                README
+              </span>
+            </div>
+            <div className="p-6 bg-slate-950/40 overflow-x-auto">
+              <Markdown source={profile.readmeContent} />
+            </div>
+          </div>
+        )}
+
         {/* ── Projects ─────────────────────────────────────── */}
         <div className="mt-10 mb-10">
           <div className="flex items-center justify-between mb-4">
@@ -239,29 +250,31 @@ export default function ProfilePage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {projects.map((p) => (
-                <div key={p.id} className="relative group">
-                  <ProjectCard project={p} />
-                  {isOwn && (
-                    <div className="absolute top-2 right-2 hidden group-hover:flex gap-1">
-                      <Link
-                        to={`/u/${username}/${p.slug}`}
-                        className="px-2 py-1 bg-slate-900/90 text-slate-300 text-xs rounded hover:text-white transition-colors backdrop-blur-sm"
-                      >
-                        View
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(p.id)}
-                        className="px-2 py-1 bg-red-900/80 text-red-300 text-xs rounded hover:text-white transition-colors"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <ProjectCard key={p.id} project={p} />
               ))}
             </div>
           )}
         </div>
+
+        {/* ── Starred works ───────────────────────────────── */}
+        {starred.length > 0 && (
+          <div className="mb-12">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 16 16" aria-hidden>
+                  <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25z" />
+                </svg>
+                <h2 className="text-base font-semibold text-white">Starred works</h2>
+              </div>
+              <span className="text-slate-600 text-xs">{starred.length} total</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {starred.map((p) => (
+                <ProjectCard key={p.id} project={p} />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -279,12 +292,9 @@ function EmptyProjects({ isOwn }) {
       {isOwn ? (
         <>
           <p className="text-white font-semibold mb-1">No projects yet</p>
-          <p className="text-slate-500 text-sm mb-6 max-w-xs">
-            Start versioning your creative work. Every upload creates a new revision.
+          <p className="text-slate-500 text-sm max-w-xs">
+            Open the Overseer desktop app and push a folder to create your first project.
           </p>
-          <Link to="/projects/new" className="px-5 py-2 btn-primary rounded-xl text-sm font-semibold">
-            Create your first project
-          </Link>
         </>
       ) : (
         <p className="text-slate-600 text-sm">No public projects yet.</p>

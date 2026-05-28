@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createApi } from '../api';
-import PushFolderModal from './PushFolderModal';
+import CreateProjectModal from './CreateProjectModal';
 import CompareVersionsModal from './CompareVersionsModal';
 import ForkSheetModal from './ForkSheetModal';
 import MergeSheetModal from './MergeSheetModal';
-import MembersModal from './MembersModal';
+import ProjectSettingsModal from './ProjectSettingsModal';
+import ConfirmModal from './ConfirmModal';
 
 const PALETTE = ['#60a5fa', '#a78bfa', '#f472b6', '#34d399'];
 const palette = (name = '') => PALETTE[name.charCodeAt(0) % PALETTE.length];
@@ -29,11 +30,15 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
   const [fileError, setFileError]       = useState('');
 
   const fileInputRef = useRef(null);
-  const [pushFolder, setPushFolder] = useState(null); // folder data for modal
+  const [showCreateProject, setShowCreateProject] = useState(false);
   const [compareFile, setCompareFile] = useState(null);
   const [forkSource, setForkSource] = useState(null); // sheet to fork from
   const [mergeSource, setMergeSource] = useState(null); // forked sheet to merge into its parent
-  const [showMembers, setShowMembers] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [forkToDelete, setForkToDelete] = useState(null); // sheet pending deletion
+  const [deletingFork, setDeletingFork] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState(null); // project pending deletion
+  const [deletingProject, setDeletingProject] = useState(false);
 
   // Load project list
   useEffect(() => {
@@ -95,9 +100,12 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
     e.target.value = '';
   };
 
-  const handlePushFolder = async () => {
-    const result = await window.electron.selectFolder();
-    if (result) setPushFolder(result);
+  const handleProjectCreated = async (created) => {
+    setShowCreateProject(false);
+    const list = await api.getProjects(user.username);
+    setProjects(list);
+    const fresh = list.find((p) => p.id === created.id);
+    if (fresh) selectProject(fresh);
   };
 
   const handleForkDone = async (created) => {
@@ -124,6 +132,45 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
       if (targetSheetId) setActiveSheet(targetSheetId);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const confirmDeleteProject = async () => {
+    if (!projectToDelete) return;
+    setDeletingProject(true);
+    try {
+      await api.deleteProject(projectToDelete.id);
+      // Refresh sidebar list and clear the workspace.
+      const list = await api.getProjects(user.username);
+      setProjects(list);
+      setSelected(null);
+      setSheetDetail(null);
+      setActiveSheet(null);
+      setProjectToDelete(null);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setDeletingProject(false);
+    }
+  };
+
+  const confirmDeleteFork = async () => {
+    if (!forkToDelete || !selected) return;
+    setDeletingFork(true);
+    try {
+      await api.deleteSheet(selected.id, forkToDelete.id);
+      const ownerUsername = selected.owner?.username ?? user.username;
+      const refreshed = await api.getProjectBySlug(ownerUsername, selected.slug);
+      setSelected(refreshed);
+      const fallback = refreshed.sheets?.find((s) => s.id === forkToDelete.parentSheetId)
+        ?? refreshed.sheets?.[0]
+        ?? null;
+      setActiveSheet(fallback?.id ?? null);
+      setForkToDelete(null);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setDeletingFork(false);
     }
   };
 
@@ -203,7 +250,7 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
         <div className="px-4 py-3 border-b border-slate-800/40 shrink-0">
           <div className="flex items-center gap-2.5">
             {user.avatarUrl ? (
-              <img src={user.avatarUrl} alt={user.username} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full shrink-0 ring-1 ring-slate-700" />
+              <img src={api.resolveUrl(user.avatarUrl)} alt={user.username} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full shrink-0 ring-1 ring-slate-700" />
             ) : (
               <div className="w-8 h-8 rounded-full shrink-0 avatar-gradient flex items-center justify-center text-white text-xs font-bold">
                 {user.username[0].toUpperCase()}
@@ -265,16 +312,16 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
           )}
         </div>
 
-        {/* Push folder */}
+        {/* Create project */}
         <div className="px-3 py-3 border-t border-slate-800/40 shrink-0">
           <button
-            onClick={handlePushFolder}
+            onClick={() => setShowCreateProject(true)}
             className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold transition-all btn-primary"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
-            Push Folder
+            Create project
           </button>
         </div>
 
@@ -299,7 +346,8 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
             <ProjectBanner
               project={selected}
               myRole={myRole}
-              onShowMembers={() => setShowMembers(true)}
+              onOpenSettings={canEdit ? () => setShowSettings(true) : null}
+              onDeleteProject={myRole === 'OWNER' ? () => setProjectToDelete(selected) : null}
             />
 
             {/* Sheet tabs */}
@@ -310,6 +358,9 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
               onFork={activeSheetSummary && canFork ? () => setForkSource(activeSheetSummary) : null}
               onMerge={activeSheetSummary?.parentSheetId && canMerge
                 ? () => setMergeSource(activeSheetSummary)
+                : null}
+              onDeleteFork={activeSheetSummary?.parentSheetId && canEdit
+                ? () => setForkToDelete(activeSheetSummary)
                 : null}
             />
 
@@ -394,31 +445,60 @@ export default function WorkspacePage({ user, token, baseUrl, onLogout }) {
         />
       )}
 
-      {/* ── Members modal ───────────────────────────────── */}
-      {showMembers && selected && (
-        <MembersModal
-          projectId={selected.id}
-          isOwner={myRole === 'OWNER'}
+      {/* ── Project settings modal ──────────────────────── */}
+      {showSettings && selected && (
+        <ProjectSettingsModal
+          project={selected}
+          myRole={myRole}
           api={api}
-          onClose={() => setShowMembers(false)}
+          onClose={() => setShowSettings(false)}
+          onSaved={async (updated) => {
+            setSelected((prev) => ({ ...prev, ...updated }));
+            // Rename can change name + slug; refresh sidebar so labels stay in sync.
+            const list = await api.getProjects(user.username);
+            setProjects(list);
+          }}
         />
       )}
 
-      {/* ── Push Folder modal ───────────────────────────── */}
-      {pushFolder && (
-        <PushFolderModal
-          folder={pushFolder}
+      {/* ── Confirm: delete fork ────────────────────────── */}
+      <ConfirmModal
+        open={!!forkToDelete}
+        title="Delete this fork?"
+        message={forkToDelete ? (
+          <>
+            The fork <span className="text-slate-200 font-medium">"{forkToDelete.name}"</span> and
+            all of its commits will be removed. The parent sheet is not affected.
+          </>
+        ) : null}
+        confirmLabel="Delete fork"
+        loading={deletingFork}
+        onConfirm={confirmDeleteFork}
+        onClose={() => { if (!deletingFork) setForkToDelete(null); }}
+      />
+
+      {/* ── Confirm: delete project ─────────────────────── */}
+      <ConfirmModal
+        open={!!projectToDelete}
+        title="Delete this project?"
+        message={projectToDelete ? (
+          <>
+            <span className="text-slate-200 font-medium">"{projectToDelete.name}"</span> and all of
+            its sheets, forks, commits, and files will be permanently removed. This cannot be undone.
+          </>
+        ) : null}
+        confirmLabel="Delete project"
+        loading={deletingProject}
+        onConfirm={confirmDeleteProject}
+        onClose={() => { if (!deletingProject) setProjectToDelete(null); }}
+      />
+
+      {/* ── Create Project modal ────────────────────────── */}
+      {showCreateProject && (
+        <CreateProjectModal
           api={api}
-          onClose={() => setPushFolder(null)}
-          onDone={(project) => {
-            setPushFolder(null);
-            // Refresh project list and navigate to the new project
-            api.getProjects(user.username).then((list) => {
-              setProjects(list);
-              const created = list.find((p) => p.id === project.id);
-              if (created) selectProject(created);
-            });
-          }}
+          onClose={() => setShowCreateProject(false)}
+          onDone={handleProjectCreated}
         />
       )}
 
@@ -503,7 +583,7 @@ const BANNER_ROLE_COLORS = {
   VIEWER: { color: '#60a5fa', bg: 'rgba(96,165,250,0.10)',  border: 'rgba(96,165,250,0.30)'  },
 };
 
-function ProjectBanner({ project, myRole, onShowMembers }) {
+function ProjectBanner({ project, myRole, onOpenSettings, onDeleteProject }) {
   const color = palette(project.name);
   const roleStyle = myRole ? BANNER_ROLE_COLORS[myRole] : null;
   return (
@@ -520,7 +600,7 @@ function ProjectBanner({ project, myRole, onShowMembers }) {
         }} />
       </div>
       <div className="relative flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />
             <h2 className="text-lg font-black text-white tracking-tight">{project.name}</h2>
@@ -551,26 +631,46 @@ function ProjectBanner({ project, myRole, onShowMembers }) {
             </div>
           )}
         </div>
-        {myRole && (
-          <button
-            onClick={onShowMembers}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
-            style={{
-              color: '#f472b6',
-              border: '1px solid rgba(244,114,182,0.25)',
-              background: 'rgba(244,114,182,0.06)',
-            }}
-            title="Project members"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-            Members
-          </button>
-        )}
+        <div className="shrink-0 flex items-center gap-1.5">
+          {onOpenSettings && (
+            <button
+              onClick={onOpenSettings}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+              style={{
+                color: '#60a5fa',
+                border: '1px solid rgba(96,165,250,0.25)',
+                background: 'rgba(96,165,250,0.06)',
+              }}
+              title="Project settings"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+              Settings
+            </button>
+          )}
+          {onDeleteProject && (
+            <button
+              onClick={onDeleteProject}
+              className="flex items-center justify-center w-8 h-8 rounded-xl transition-all"
+              style={{
+                color: '#f87171',
+                border: '1px solid rgba(248,113,113,0.25)',
+                background: 'rgba(248,113,113,0.06)',
+              }}
+              title="Delete project"
+              aria-label="Delete project"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -597,7 +697,7 @@ function ReadOnlyBanner({ role }) {
   );
 }
 
-function SheetTabs({ sheets, activeSheet, onSelect, onFork, onMerge }) {
+function SheetTabs({ sheets, activeSheet, onSelect, onFork, onMerge, onDeleteFork }) {
   if (sheets.length === 0) return null;
   return (
     <div className="flex items-center gap-1 px-6 py-2 border-b border-slate-800/60 shrink-0 overflow-x-auto"
@@ -637,6 +737,26 @@ function SheetTabs({ sheets, activeSheet, onSelect, onFork, onMerge }) {
       })}
 
       <div className="ml-auto flex items-center gap-1.5 shrink-0">
+        {onDeleteFork && (
+          <button
+            onClick={onDeleteFork}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap"
+            style={{
+              color: '#f87171',
+              border: '1px solid rgba(248,113,113,0.25)',
+              background: 'rgba(248,113,113,0.06)',
+            }}
+            title="Delete this fork"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <path d="M10 11v6M14 11v6" />
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+            </svg>
+            Delete fork
+          </button>
+        )}
         {onMerge && (
           <button
             onClick={onMerge}

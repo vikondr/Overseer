@@ -48,13 +48,20 @@ export default function CompareVersionsModal({ open, onClose, file, sheetId, api
     }
   };
 
-  const scorePct = result ? (result.score * 100).toFixed(2) : null;
+  const scorePct = result ? Math.round(result.score * 100) : null;
   const scoreColor = result
     ? result.score > 0.95 ? '#34d399'
     : result.score > 0.8  ? '#60a5fa'
     : result.score > 0.5  ? '#a78bfa'
     : '#f472b6'
     : '#64748b';
+  const scoreLabel = result
+    ? result.score > 0.99 ? 'Nearly identical'
+    : result.score > 0.95 ? 'Very similar'
+    : result.score > 0.8  ? 'Mostly similar'
+    : result.score > 0.5  ? 'Noticeably different'
+    : 'Very different'
+    : '';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -89,8 +96,8 @@ export default function CompareVersionsModal({ open, onClose, file, sheetId, api
         ) : (
           <>
             <div className="grid grid-cols-2 gap-3 mt-4 relative">
-              <VersionPicker label="Base (A)" value={aId} onChange={setAId} versions={versions} />
-              <VersionPicker label="Compare (B)" value={bId} onChange={setBId} versions={versions} />
+              <VersionPicker label="Before" value={aId} onChange={setAId} versions={versions} />
+              <VersionPicker label="After" value={bId} onChange={setBId} versions={versions} />
             </div>
 
             <button
@@ -98,7 +105,7 @@ export default function CompareVersionsModal({ open, onClose, file, sheetId, api
               disabled={running || !aId || !bId || aId === bId}
               className="relative w-full mt-4 py-2 btn-primary text-sm rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {running ? 'Running diff…' : 'Run pixel diff'}
+              {running ? 'Comparing…' : 'Compare these versions'}
             </button>
 
             {error && (
@@ -108,20 +115,26 @@ export default function CompareVersionsModal({ open, onClose, file, sheetId, api
             {result && (
               <div className="relative mt-5 space-y-3">
                 <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-800/70 bg-slate-950/40">
-                  <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">SSIM</span>
                   <span className="text-2xl font-black tabular-nums" style={{ color: scoreColor }}>
                     {scorePct}%
                   </span>
-                  <span className="ml-auto text-xs text-slate-600 font-mono">
+                  <div className="flex flex-col leading-tight">
+                    <span className="text-xs text-slate-400 font-medium">match</span>
+                    <span className="text-[11px] text-slate-500">{scoreLabel}</span>
+                  </div>
+                  <span className="ml-auto text-xs text-slate-600">
                     {result.width}×{result.height}
                   </span>
                 </div>
                 <div className="rounded-xl border border-slate-800/70 overflow-hidden bg-slate-950/40">
                   <img
                     src={`data:image/png;base64,${result.diff_image}`}
-                    alt="Pixel diff"
+                    alt="Highlighted changes between the two versions"
                     className="w-full max-h-[60vh] object-contain"
                   />
+                  <p className="px-4 py-2 text-[11px] text-slate-500 border-t border-slate-800/70">
+                    Coloured areas highlight what changed between the two versions.
+                  </p>
                 </div>
               </div>
             )}

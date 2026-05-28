@@ -2,19 +2,11 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getProjectBySlug, starProject, unstarProject } from '../api/projects';
-import { getSheet, createSheet, deleteSheet } from '../api/sheets';
-import {
-  getProjectMembers,
-  addProjectMember,
-  updateProjectMemberRole,
-  removeProjectMember,
-} from '../api/members';
+import { getSheet } from '../api/sheets';
 import LoadingPage from '../components/LoadingPage';
 import PageBanner from '../components/PageBanner';
 import ImageLightbox from '../components/ImageLightbox';
 import CompareVersionsModal from '../components/CompareVersionsModal';
-import ForkSheetModal from '../components/ForkSheetModal';
-import MergeSheetModal from '../components/MergeSheetModal';
 import Markdown from '../components/Markdown';
 
 export default function ProjectPage() {
@@ -29,21 +21,12 @@ export default function ProjectPage() {
   const [loading, setLoading] = useState(true);
   const [starred, setStarred] = useState(false);
   const [starLoading, setStarLoading] = useState(false);
-  const [newSheetName, setNewSheetName] = useState('');
-  const [showNewSheet, setShowNewSheet] = useState(false);
   const [previewFile, setPreviewFile] = useState(null);
   const [compareFile, setCompareFile] = useState(null);
-  const [forkSource, setForkSource]   = useState(null);
-  const [mergeSource, setMergeSource] = useState(null);
 
-  // Authoritative role comes from the backend response; fall back to ownership-by-username
-  // so the UI doesn't look broken on a stale snapshot before the backfill runs.
+  // Web is a read-only viewer. All repo mutations (sheets, forks, merges, members,
+  // file uploads) live in the desktop app — see Overseer architecture v0.1.5.
   const myRole = project?.myRole ?? (user?.username === username ? 'OWNER' : null);
-  const isOwner = myRole === 'OWNER';
-  const canEdit = myRole === 'OWNER' || myRole === 'EDITOR';
-  // PUBLIC projects can be forked by anyone with read access (collaborative-VCS pitch).
-  // PRIVATE/UNLISTED require EDITOR+ (matches SheetService.forkSheet).
-  const canFork = !!user && (project?.visibility === 'PUBLIC' || canEdit);
   const activeSheetSummary = sheets.find((s) => s.id === activeSheet) || null;
   const isFork = !!activeSheetSummary?.parentSheetId;
 
@@ -85,59 +68,6 @@ export default function ProjectPage() {
     } finally {
       setStarLoading(false);
     }
-  };
-
-  const handleCreateSheet = async (e) => {
-    e.preventDefault();
-    if (!newSheetName.trim()) return;
-    try {
-      const sheet = await createSheet(project.id, { name: newSheetName.trim() });
-      setSheets((s) => [
-        ...s,
-        { id: sheet.id, name: sheet.name, isDefault: sheet.isDefault, fileCount: 0 },
-      ]);
-      setActiveSheet(sheet.id);
-      setNewSheetName('');
-      setShowNewSheet(false);
-    } catch (e) {
-      alert(e.message);
-    }
-  };
-
-  const handleDeleteSheet = async (sheetId) => {
-    if (!confirm('Delete this sheet and all its files?')) return;
-    try {
-      await deleteSheet(project.id, sheetId);
-      const remaining = sheets.filter((s) => s.id !== sheetId);
-      setSheets(remaining);
-      if (activeSheet === sheetId) setActiveSheet(remaining[0]?.id ?? null);
-    } catch (e) {
-      alert(e.message);
-    }
-  };
-
-  const refreshProject = async () => {
-    try {
-      const refreshed = await getProjectBySlug(username, slug);
-      setProject(refreshed);
-      setSheets(refreshed.sheets || []);
-      return refreshed;
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleForkDone = async (created) => {
-    setForkSource(null);
-    await refreshProject();
-    setActiveSheet(created.id);
-  };
-
-  const handleMergeDone = async (result) => {
-    const targetSheetId = result?.parentSheetId ?? mergeSource?.parentSheetId;
-    setMergeSource(null);
-    await refreshProject();
-    if (targetSheetId) setActiveSheet(targetSheetId);
   };
 
   if (loading) return <LoadingPage />;
@@ -226,14 +156,6 @@ export default function ProjectPage() {
                   <span className="font-semibold">{project.starCount}</span>
                 </button>
               )}
-              {canEdit && (
-                <Link
-                  to={`/u/${username}/${slug}/edit`}
-                  className="px-3 py-1.5 bg-slate-900/80 border border-slate-700 hover:border-slate-500 text-slate-300 text-sm rounded-xl transition-colors backdrop-blur-sm"
-                >
-                  Edit
-                </Link>
-              )}
             </div>
           </div>
         </div>
@@ -248,15 +170,6 @@ export default function ProjectPage() {
             <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: '#60a5fa' }}>
               Sheets
             </span>
-            {canEdit && (
-              <button
-                onClick={() => setShowNewSheet(true)}
-                className="w-6 h-6 rounded-lg bg-slate-900 border border-slate-800 hover:border-blue-600/60 text-slate-500 hover:text-blue-400 flex items-center justify-center transition-all text-base leading-none"
-                title="New sheet"
-              >
-                +
-              </button>
-            )}
           </div>
 
           <div className="space-y-0.5">
@@ -298,48 +211,13 @@ export default function ProjectPage() {
                       {sheet.fileCount}
                     </span>
                   )}
-                  {canEdit && !sheet.isDefault && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteSheet(sheet.id); }}
-                      className="opacity-0 group-hover:opacity-100 text-slate-700 hover:text-red-400 text-xs transition-all ml-0.5"
-                      title="Delete sheet"
-                    >
-                      ✕
-                    </button>
-                  )}
                 </div>
               </div>
             ))}
           </div>
 
-          {showNewSheet && (
-            <form onSubmit={handleCreateSheet} className="mt-2">
-              <input
-                autoFocus
-                value={newSheetName}
-                onChange={(e) => setNewSheetName(e.target.value)}
-                placeholder="Sheet name"
-                className="w-full px-2.5 py-1.5 bg-slate-900 border border-blue-700/50 text-white text-sm rounded-lg focus:outline-none placeholder:text-slate-700"
-              />
-              <div className="flex gap-1 mt-1">
-                <button type="submit" className="flex-1 py-1 btn-primary text-xs rounded-lg font-medium">
-                  Add
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowNewSheet(false); setNewSheetName(''); }}
-                  className="flex-1 py-1 bg-slate-900 border border-slate-800 text-slate-500 text-xs rounded-lg"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          )}
-
-          {sheets.length === 0 && !showNewSheet && (
-            <p className="text-slate-700 text-xs mt-2 pl-1">
-              {canEdit ? 'No sheets yet.' : 'No sheets.'}
-            </p>
+          {sheets.length === 0 && (
+            <p className="text-slate-700 text-xs mt-2 pl-1">No sheets.</p>
           )}
         </div>
 
@@ -371,42 +249,12 @@ export default function ProjectPage() {
                 </div>
 
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {isFork && canEdit && (
-                    <button
-                      onClick={() => setMergeSource(activeSheetSummary)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
-                      style={{
-                        color: '#60a5fa',
-                        border: '1px solid rgba(96,165,250,0.25)',
-                        background: 'rgba(96,165,250,0.06)',
-                      }}
-                      title="Merge this fork back into its parent"
-                    >
-                      <MergeIcon className="w-3 h-3" color="#60a5fa" />
-                      Merge
-                    </button>
-                  )}
-                  {canFork && (
-                    <button
-                      onClick={() => setForkSource(activeSheetSummary)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
-                      style={{
-                        color: '#a78bfa',
-                        border: '1px solid rgba(167,139,250,0.25)',
-                        background: 'rgba(167,139,250,0.06)',
-                      }}
-                      title="Fork this sheet"
-                    >
-                      <BranchIcon className="w-3 h-3" color="#a78bfa" />
-                      Fork
-                    </button>
-                  )}
-                  {canEdit && (
+                  {myRole && (
                     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 border border-slate-800 text-slate-500 text-xs rounded-xl">
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
-                      Push commits via the desktop app
+                      Manage sheets, forks and commits in the desktop app
                     </div>
                   )}
                 </div>
@@ -423,7 +271,7 @@ export default function ProjectPage() {
                     </svg>
                   </div>
                   <p className="text-slate-600 text-sm">
-                    {canEdit ? 'Push files via the desktop app to get started.' : 'No files in this sheet.'}
+                    {myRole ? 'Push files via the desktop app to get started.' : 'No files in this sheet.'}
                   </p>
                 </div>
               ) : (
@@ -477,13 +325,6 @@ export default function ProjectPage() {
         </div>
       )}
 
-      {/* ── Members (visible to any member; mutations OWNER-only) ── */}
-      {myRole && project && (
-        <div className="max-w-7xl mx-auto px-4 pb-12">
-          <MembersSection projectId={project.id} canManage={isOwner} />
-        </div>
-      )}
-
       {/* ── Image Lightbox ──────────────────────────────────── */}
       <ImageLightbox
         open={!!previewFile}
@@ -505,27 +346,6 @@ export default function ProjectPage() {
         sheetId={activeSheet}
       />
 
-      {/* ── Fork Sheet Modal ────────────────────────────────── */}
-      {forkSource && project && (
-        <ForkSheetModal
-          projectId={project.id}
-          sourceSheet={forkSource}
-          onClose={() => setForkSource(null)}
-          onDone={handleForkDone}
-        />
-      )}
-
-      {/* ── Merge Sheet Modal ───────────────────────────────── */}
-      {mergeSource && project && (
-        <MergeSheetModal
-          projectId={project.id}
-          forkSheet={mergeSource}
-          parentSheet={sheets.find((s) => s.id === mergeSource.parentSheetId) || null}
-          canMerge={canEdit}
-          onClose={() => setMergeSource(null)}
-          onDone={handleMergeDone}
-        />
-      )}
     </div>
   );
 }
@@ -538,212 +358,6 @@ function BranchIcon({ className, color }) {
       <circle cx="6" cy="18" r="3" />
       <path d="M18 9a9 9 0 0 1-9 9" />
     </svg>
-  );
-}
-
-function MergeIcon({ className, color }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <circle cx="18" cy="18" r="3" />
-      <circle cx="6" cy="6" r="3" />
-      <path d="M6 21V9a9 9 0 0 0 9 9" />
-    </svg>
-  );
-}
-
-/* ── Members section ───────────────────────────────────── */
-
-const ROLE_COLORS = {
-  OWNER:  { color: '#f472b6', bg: 'rgba(244,114,182,0.10)', border: 'rgba(244,114,182,0.30)' },
-  EDITOR: { color: '#a78bfa', bg: 'rgba(167,139,250,0.10)', border: 'rgba(167,139,250,0.30)' },
-  VIEWER: { color: '#60a5fa', bg: 'rgba(96,165,250,0.10)',  border: 'rgba(96,165,250,0.30)'  },
-};
-
-function MembersSection({ projectId, canManage }) {
-  const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [newUsername, setNewUsername] = useState('');
-  const [newRole, setNewRole] = useState('EDITOR');
-  const [adding, setAdding] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    getProjectMembers(projectId)
-      .then((list) => { if (!cancelled) setMembers(list); })
-      .catch((e) => { if (!cancelled) setError(e.message); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [projectId]);
-
-  const handleAdd = async (e) => {
-    e.preventDefault();
-    const username = newUsername.trim();
-    if (!username) return;
-    setAdding(true);
-    setError('');
-    try {
-      const created = await addProjectMember(projectId, { username, role: newRole });
-      setMembers((m) => [...m, created]);
-      setNewUsername('');
-      setNewRole('EDITOR');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  const handleRoleChange = async (userId, role) => {
-    setError('');
-    try {
-      const updated = await updateProjectMemberRole(projectId, userId, role);
-      setMembers((list) => list.map((m) => (m.user.id === userId ? updated : m)));
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const handleRemove = async (userId, username) => {
-    if (!confirm(`Remove ${username} from this project?`)) return;
-    setError('');
-    try {
-      await removeProjectMember(projectId, userId);
-      setMembers((list) => list.filter((m) => m.user.id !== userId));
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  return (
-    <div className="border border-slate-800/70 rounded-2xl overflow-hidden">
-      <div
-        className="flex items-center gap-2.5 px-5 py-3 border-b border-slate-800/60"
-        style={{ background: 'linear-gradient(90deg, rgba(244,114,182,0.07) 0%, transparent 60%)' }}
-      >
-        <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#f472b6' }} />
-        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#f472b6' }}>
-          Members
-        </span>
-        <span className="text-slate-700 text-xs ml-auto">{members.length}</span>
-      </div>
-
-      <div className="p-5 space-y-4 bg-slate-950/40">
-        {/* Add member form — OWNER only */}
-        {canManage && (
-          <form onSubmit={handleAdd} className="flex flex-wrap gap-2">
-            <input
-              type="text"
-              value={newUsername}
-              onChange={(e) => setNewUsername(e.target.value)}
-              placeholder="Username"
-              className="flex-1 min-w-[180px] px-3 py-2 bg-slate-900 border border-slate-800 focus:border-blue-600 text-white text-sm rounded-xl placeholder:text-slate-700 focus:outline-none transition-colors"
-            />
-            <select
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value)}
-              className="px-3 py-2 bg-slate-900 border border-slate-800 text-white text-sm rounded-xl focus:outline-none focus:border-violet-600 transition-colors"
-            >
-              <option value="EDITOR">Editor</option>
-              <option value="VIEWER">Viewer</option>
-            </select>
-            <button
-              type="submit"
-              disabled={adding || !newUsername.trim()}
-              className="px-4 py-2 btn-primary text-sm rounded-xl font-semibold disabled:opacity-40"
-            >
-              {adding ? 'Adding…' : 'Add member'}
-            </button>
-          </form>
-        )}
-
-        {error && <p className="text-red-400 text-xs">{error}</p>}
-
-        {/* Member list */}
-        {loading ? (
-          <div className="text-slate-700 text-sm animate-pulse">Loading members…</div>
-        ) : members.length === 0 ? (
-          <p className="text-slate-700 text-sm">No members yet.</p>
-        ) : (
-          <div className="space-y-1.5">
-            {members.map((m) => (
-              <MemberRow
-                key={m.id}
-                member={m}
-                canManage={canManage}
-                onRoleChange={(role) => handleRoleChange(m.user.id, role)}
-                onRemove={() => handleRemove(m.user.id, m.user.username)}
-              />
-            ))}
-          </div>
-        )}
-
-        {!canManage && (
-          <p className="text-slate-700 text-[11px] pt-1">
-            Only the project owner can add, remove, or change roles.
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function MemberRow({ member, canManage, onRoleChange, onRemove }) {
-  const isOwner = member.role === 'OWNER';
-  const c = ROLE_COLORS[member.role] ?? ROLE_COLORS.VIEWER;
-  return (
-    <div className="group flex items-center gap-3 px-3 py-2 rounded-xl border border-slate-800/60 bg-slate-900/40 hover:bg-slate-900/70 transition-colors">
-      {member.user.avatarUrl ? (
-        <img
-          src={member.user.avatarUrl}
-          alt=""
-          referrerPolicy="no-referrer"
-          className="w-8 h-8 rounded-full ring-1 ring-slate-700/60 shrink-0"
-        />
-      ) : (
-        <div className="w-8 h-8 rounded-full shrink-0 avatar-gradient flex items-center justify-center text-white text-xs font-bold">
-          {(member.user.username || '?')[0].toUpperCase()}
-        </div>
-      )}
-
-      <div className="min-w-0 flex-1">
-        <p className="text-white text-sm font-medium truncate leading-tight">
-          {member.user.displayName || member.user.username}
-        </p>
-        <p className="text-slate-600 text-xs truncate">@{member.user.username}</p>
-      </div>
-
-      {isOwner || !canManage ? (
-        <span
-          className="text-[11px] font-semibold uppercase tracking-widest px-2.5 py-1 rounded-lg border"
-          style={{ color: c.color, background: c.bg, borderColor: c.border }}
-        >
-          {member.role.toLowerCase()}
-        </span>
-      ) : (
-        <select
-          value={member.role}
-          onChange={(e) => onRoleChange(e.target.value)}
-          className="text-xs font-semibold uppercase tracking-widest px-2.5 py-1 rounded-lg border bg-transparent focus:outline-none"
-          style={{ color: c.color, background: c.bg, borderColor: c.border }}
-        >
-          <option value="EDITOR" style={{ color: '#0f172a' }}>Editor</option>
-          <option value="VIEWER" style={{ color: '#0f172a' }}>Viewer</option>
-        </select>
-      )}
-
-      {canManage && !isOwner && (
-        <button
-          type="button"
-          onClick={onRemove}
-          className="text-slate-700 hover:text-red-400 text-sm opacity-0 group-hover:opacity-100 transition-all px-2"
-          title="Remove member"
-        >
-          ✕
-        </button>
-      )}
-    </div>
   );
 }
 

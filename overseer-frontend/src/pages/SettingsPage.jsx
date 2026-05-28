@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { updateProfile } from '../api/users';
+import { updateProfile, uploadAvatar } from '../api/users';
 import TagPicker from '../components/TagPicker';
 import Section from '../components/Section';
 import Field from '../components/Field';
@@ -14,6 +14,7 @@ export default function SettingsPage() {
     username: '',
     displayName: '',
     bio: '',
+    readmeContent: '',
     location: '',
     websiteUrl: '',
     portfolioUrl: '',
@@ -22,6 +23,9 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState(null);
+  const avatarInputRef = useRef(null);
 
   useEffect(() => {
     if (user) {
@@ -29,6 +33,7 @@ export default function SettingsPage() {
         username: user.username || '',
         displayName: user.displayName || '',
         bio: user.bio || '',
+        readmeContent: user.readmeContent || '',
         location: user.location || '',
         websiteUrl: user.websiteUrl || '',
         portfolioUrl: user.portfolioUrl || '',
@@ -38,6 +43,30 @@ export default function SettingsPage() {
   }, [user]);
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setAvatarError(null);
+    if (!/^image\/(png|jpe?g|webp|gif)$/i.test(file.type)) {
+      setAvatarError('Please choose a PNG, JPEG, WebP or GIF image.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError('That image is too large — please choose one under 5 MB.');
+      return;
+    }
+    setAvatarUploading(true);
+    try {
+      await uploadAvatar(file);
+      await reload();
+    } catch (err) {
+      setAvatarError(err.message);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,6 +79,9 @@ export default function SettingsPage() {
         username: usernameChanged ? form.username : undefined,
         displayName: form.displayName || undefined,
         bio: form.bio || undefined,
+        // Send empty string explicitly so the user can clear the README;
+        // undefined would mean "don't change" on the backend.
+        readmeContent: form.readmeContent,
         location: form.location || undefined,
         websiteUrl: form.websiteUrl || undefined,
         portfolioUrl: form.portfolioUrl || undefined,
@@ -90,17 +122,57 @@ export default function SettingsPage() {
               style={{ background: 'radial-gradient(circle, rgba(96,165,250,0.1) 0%, transparent 70%)' }} />
 
             <div className="relative flex items-center gap-4 p-5">
-              {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt={user.username} className="w-14 h-14 rounded-full shrink-0" />
-              ) : (
-                <div className="w-14 h-14 rounded-full avatar-gradient flex items-center justify-center text-white font-bold text-xl shrink-0">
-                  {user.username[0].toUpperCase()}
-                </div>
-              )}
+              <div className="relative shrink-0">
+                {user.avatarUrl ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt={user.username}
+                    referrerPolicy="no-referrer"
+                    className="w-14 h-14 rounded-full object-cover ring-1 ring-slate-700"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-full avatar-gradient flex items-center justify-center text-white font-bold text-xl">
+                    {user.username[0].toUpperCase()}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={avatarUploading}
+                  title="Change profile picture"
+                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-slate-900 border border-slate-700 hover:border-blue-500 text-slate-300 hover:text-white flex items-center justify-center transition-colors disabled:opacity-50"
+                >
+                  {avatarUploading ? (
+                    <span className="w-3 h-3 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+                  ) : (
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a4 4 0 01-1.414.93l-3.243 1.08 1.08-3.243a4 4 0 01.93-1.414z" />
+                    </svg>
+                  )}
+                </button>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                />
+              </div>
               <div>
                 <p className="text-white font-semibold">{user.displayName || user.username}</p>
                 <p className="text-slate-400 text-sm">@{user.username}</p>
                 <p className="text-slate-600 text-xs mt-0.5">{user.email}</p>
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={avatarUploading}
+                  className="mt-2 text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50"
+                >
+                  {avatarUploading ? 'Uploading…' : 'Change profile picture'}
+                </button>
+                {avatarError && (
+                  <p className="text-red-400 text-xs mt-1">{avatarError}</p>
+                )}
               </div>
             </div>
           </div>
@@ -129,6 +201,29 @@ export default function SettingsPage() {
             <Field label="Display Name" value={form.displayName} onChange={set('displayName')} />
             <Field label="Bio" value={form.bio} onChange={set('bio')} multiline />
             <Field label="Location" value={form.location} onChange={set('location')} />
+          </Section>
+
+          {/* README section */}
+          <Section color="#f472b6" label="README">
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                Profile README
+                <span className="ml-2 text-xs font-normal text-slate-500">
+                  Markdown supported · shown on your public profile
+                </span>
+              </label>
+              <textarea
+                value={form.readmeContent}
+                onChange={set('readmeContent')}
+                rows={10}
+                maxLength={20000}
+                placeholder="# Hi, I'm…\n\nA few paragraphs about your practice, what you're working on, where to find more of your work."
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 text-white placeholder-slate-600 rounded-lg focus:outline-none focus:border-pink-400 text-sm transition-colors font-mono leading-relaxed resize-y"
+              />
+              <p className="mt-1.5 text-xs text-slate-600">
+                {form.readmeContent.length} / 20000 characters
+              </p>
+            </div>
           </Section>
 
           {/* Links section */}

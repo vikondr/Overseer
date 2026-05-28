@@ -6,11 +6,9 @@ import LandingPage from './pages/LandingPage';
 import ExplorePage from './pages/ExplorePage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import DashboardPage from './pages/DashboardPage';
-import NewProjectPage from './pages/NewProjectPage';
 import ProfilePage from './pages/ProfilePage';
 import ProjectPage from './pages/ProjectPage';
 import SettingsPage from './pages/SettingsPage';
-import EditProjectPage from './pages/EditProjectPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 export default function App() {
@@ -25,26 +23,10 @@ export default function App() {
           <Route path="/u/:username" element={<ProfilePage />} />
           <Route path="/u/:username/:slug" element={<ProjectPage />} />
           <Route
-            path="/u/:username/:slug/edit"
-            element={
-              <ProtectedRoute>
-                <EditProjectPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/dashboard"
             element={
               <ProtectedRoute>
                 <DashboardPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/projects/new"
-            element={
-              <ProtectedRoute>
-                <NewProjectPage />
               </ProtectedRoute>
             }
           />

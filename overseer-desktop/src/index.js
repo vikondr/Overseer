@@ -1,10 +1,15 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require('electron');
 const fs    = require('fs');
 const path  = require('path');
 const https = require('https');
 const http  = require('http');
 
 if (require('electron-squirrel-startup')) app.quit();
+
+// Hide the default OS menu bar (File / Edit / View / Window / Help) — the app
+// has no native menu commands, so the bar is just visual noise. Must be set
+// before windows are created.
+Menu.setApplicationMenu(null);
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -13,6 +18,8 @@ function createWindow() {
     minWidth: 860,
     minHeight: 580,
     backgroundColor: '#020617',
+    autoHideMenuBar: true,
+    icon: path.join(__dirname, '..', 'assets', 'overseer.svg'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,

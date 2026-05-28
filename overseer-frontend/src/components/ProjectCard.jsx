@@ -1,5 +1,13 @@
 import { Link } from 'react-router-dom';
 
+const ACCENTS = ['#60a5fa', '#a78bfa', '#f472b6', '#34d399', '#fb923c'];
+const accentFor = (name = '?') => ACCENTS[name.charCodeAt(0) % ACCENTS.length];
+
+const VISIBILITY_BADGE = {
+  PRIVATE:  { label: 'Private',  color: '#cbd5e1', bg: 'rgba(15,23,42,0.85)',  border: 'rgba(148,163,184,0.30)' },
+  UNLISTED: { label: 'Unlisted', color: '#fbbf24', bg: 'rgba(45,28,9,0.85)',   border: 'rgba(251,191,36,0.30)' },
+};
+
 function timeAgo(dateStr) {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -7,126 +15,154 @@ function timeAgo(dateStr) {
   const hours = Math.floor(mins / 60);
   const days = Math.floor(hours / 24);
   const months = Math.floor(days / 30);
-  if (months > 0) return `${months}mo ago`;
-  if (days > 0) return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  if (mins > 0) return `${mins}m ago`;
-  return 'just now';
-}
-
-const PALETTES = [
-  { gradient: 'from-blue-900/80 via-blue-950 to-slate-900',    glow: 'card-glow-blue',   accent: '#60a5fa' },
-  { gradient: 'from-violet-900/80 via-violet-950 to-slate-900', glow: 'card-glow-violet', accent: '#a78bfa' },
-  { gradient: 'from-pink-900/80 via-pink-950 to-slate-900',    glow: 'card-glow-pink',   accent: '#f472b6' },
-  { gradient: 'from-emerald-900/80 via-emerald-950 to-slate-900', glow: 'card-glow-green', accent: '#34d399' },
-];
-
-function getPalette(name = '') {
-  return PALETTES[name.charCodeAt(0) % PALETTES.length];
+  if (months > 0) return `${months}mo`;
+  if (days > 0) return `${days}d`;
+  if (hours > 0) return `${hours}h`;
+  if (mins > 0) return `${mins}m`;
+  return 'now';
 }
 
 export default function ProjectCard({ project }) {
-  const { name, slug, description, thumbnailUrl, tags = [], starCount, owner, updatedAt } = project;
-  const palette = getPalette(name);
+  const { name, slug, description, thumbnailUrl, tags = [], starCount, owner, updatedAt, visibility } = project;
+  const accent = accentFor(name);
+  const vis = VISIBILITY_BADGE[visibility];
 
   return (
     <Link
       to={`/u/${owner?.username}/${slug}`}
-      className={`group flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${palette.glow}`}
+      className="group relative flex flex-col rounded-2xl overflow-hidden bg-slate-900/40 border border-slate-800/70 transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-700"
+      style={{ '--accent': accent }}
     >
-      {/* Thumbnail */}
-      <div className="relative aspect-video overflow-hidden">
+      {/* Accent glow on hover */}
+      <span
+        aria-hidden
+        className="absolute -inset-px rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+        style={{ boxShadow: `0 12px 38px -18px ${accent}aa, inset 0 0 0 1px ${accent}30` }}
+      />
+
+      {/* Thumbnail (4:3 — taller than the old aspect-video, feels more portfolio-grade) */}
+      <div className="relative aspect-[4/3] overflow-hidden">
         {thumbnailUrl ? (
-          <>
-            <img
-              src={thumbnailUrl}
-              alt={name}
-              className="w-full h-full object-cover group-hover:scale-[1.05] transition-transform duration-500"
-            />
-            <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-slate-900/80 to-transparent" />
-          </>
+          <img
+            src={thumbnailUrl}
+            alt={name}
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+          />
         ) : (
-          <div className={`w-full h-full bg-gradient-to-br ${palette.gradient} flex items-center justify-center relative`}>
-            {/* Subtle grid pattern */}
+          <div
+            className="w-full h-full flex items-center justify-center relative"
+            style={{
+              background: `linear-gradient(135deg, ${accent}22 0%, rgba(15,23,42,0.95) 70%)`,
+            }}
+          >
             <div
-              className="absolute inset-0 opacity-20"
+              className="absolute inset-0 opacity-25"
               style={{
-                backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.08) 1px, transparent 1px)',
-                backgroundSize: '20px 20px',
+                backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)',
+                backgroundSize: '22px 22px',
               }}
             />
-            {/* Glow dot */}
             <div
-              className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full blur-2xl opacity-30"
-              style={{ background: palette.accent }}
+              className="absolute top-[35%] left-1/2 -translate-x-1/2 w-32 h-32 rounded-full blur-3xl opacity-40"
+              style={{ background: accent }}
             />
-            <span className="relative text-6xl font-black select-none tracking-tight" style={{ color: `${palette.accent}50` }}>
-              {name[0]?.toUpperCase()}
+            <span
+              className="relative text-7xl font-black tracking-tight select-none"
+              style={{ color: `${accent}66` }}
+            >
+              {name[0]?.toUpperCase() ?? '?'}
             </span>
           </div>
         )}
 
-        {/* Star badge */}
-        {starCount > 0 && (
-          <div className="absolute top-2.5 right-2.5 flex items-center gap-1 px-2 py-0.5 bg-black/60 backdrop-blur-sm text-slate-200 text-xs rounded-full border border-white/5">
-            <svg className="w-3 h-3 text-yellow-400" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25z" />
-            </svg>
-            {starCount}
-          </div>
-        )}
+        {/* Top-row badges */}
+        <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between gap-2 pointer-events-none">
+          {vis ? (
+            <span
+              className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-md backdrop-blur-md border"
+              style={{ color: vis.color, background: vis.bg, borderColor: vis.border }}
+            >
+              {vis.label}
+            </span>
+          ) : <span />}
+
+          {starCount > 0 && (
+            <span className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full backdrop-blur-md bg-black/55 text-slate-100 border border-white/10">
+              <svg className="w-3 h-3 text-yellow-400" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25z" />
+              </svg>
+              <span className="font-medium">{starCount}</span>
+            </span>
+          )}
+        </div>
+
+        {/* Bottom gradient + pinned title/owner — visible always, just stronger over photos */}
+        <div className="absolute inset-x-0 bottom-0 p-3 pt-10 bg-gradient-to-t from-slate-950/90 via-slate-950/50 to-transparent">
+          <h3 className="text-white font-semibold text-[15px] leading-tight line-clamp-1 drop-shadow-sm">
+            {name}
+          </h3>
+          {owner && (
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-300">
+              {owner.avatarUrl ? (
+                <img
+                  src={owner.avatarUrl}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  className="w-4 h-4 rounded-full ring-1 ring-white/20"
+                />
+              ) : (
+                <span
+                  className="w-4 h-4 rounded-full text-[8px] font-bold flex items-center justify-center text-white"
+                  style={{ background: `${accent}cc` }}
+                >
+                  {owner.username?.[0]?.toUpperCase()}
+                </span>
+              )}
+              <span className="truncate">@{owner.username}</span>
+              {updatedAt && (
+                <>
+                  <span className="text-slate-500">·</span>
+                  <span className="text-slate-400">{timeAgo(updatedAt)}</span>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Content */}
-      <div className="flex flex-col flex-1 p-4">
-        <h3
-          className="text-white font-semibold text-sm leading-snug line-clamp-1 mb-1 transition-colors"
-          style={{ '--tw-text-opacity': 1 }}
-        >
-          <span className="group-hover:text-transparent group-hover:bg-clip-text transition-all duration-300"
-            style={{
-              backgroundImage: `linear-gradient(135deg, #fff 0%, ${palette.accent} 100%)`,
-              WebkitBackgroundClip: 'text',
-            }}
-          >
-            {name}
-          </span>
-        </h3>
-
+      {/* Footer: description + tags */}
+      <div className="flex flex-col gap-2 px-3.5 py-3 border-t border-slate-800/60 bg-slate-950/30">
         {description ? (
-          <p className="text-slate-500 text-xs leading-relaxed line-clamp-2 mb-3 flex-1">
+          <p className="text-slate-400 text-[12px] leading-relaxed line-clamp-2">
             {description}
           </p>
         ) : (
-          <div className="flex-1" />
+          <p className="text-slate-700 text-[12px] italic">No description</p>
         )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-2 mt-auto pt-2 border-t border-slate-800/80">
-          <div className="flex flex-wrap gap-1 min-w-0">
-            {(tags || []).slice(0, 2).map((tag) => (
+        {(tags || []).length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-0.5">
+            {tags.slice(0, 3).map((tag) => (
               <span
                 key={tag}
-                className="px-1.5 py-0.5 bg-slate-800/80 text-slate-500 text-[11px] rounded-md truncate max-w-[80px]"
+                className="px-1.5 py-0.5 text-[10px] rounded-md font-medium"
+                style={{
+                  color: `${accent}`,
+                  background: `${accent}14`,
+                  border: `1px solid ${accent}28`,
+                }}
               >
                 {tag}
               </span>
             ))}
-          </div>
-
-          <div className="flex items-center gap-1.5 text-slate-600 text-xs shrink-0">
-            {owner?.avatarUrl ? (
-              <img src={owner.avatarUrl} alt={owner.username} referrerPolicy="no-referrer" className="w-4 h-4 rounded-full ring-1 ring-slate-700" />
-            ) : (
-              <div className="w-4 h-4 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 text-[8px] font-bold">
-                {owner?.username?.[0]?.toUpperCase()}
-              </div>
+            {tags.length > 3 && (
+              <span className="px-1.5 py-0.5 text-[10px] rounded-md text-slate-600 bg-slate-800/40 border border-slate-800">
+                +{tags.length - 3}
+              </span>
             )}
-            <span className="text-slate-500 truncate max-w-[70px]">{owner?.username}</span>
-            {updatedAt && <span className="text-slate-700">·</span>}
-            {updatedAt && <span className="text-slate-600">{timeAgo(updatedAt)}</span>}
           </div>
-        </div>
+        )}
       </div>
     </Link>
   );

@@ -36,8 +36,9 @@ export default function Navbar() {
         {/* Logo */}
         <Link
           to="/"
-          className="font-bold text-white tracking-tight text-[15px] shrink-0"
+          className="flex items-center gap-2 font-bold text-white tracking-tight text-[15px] shrink-0"
         >
+          <img src="/overseer.svg" alt="" className="w-5 h-5" aria-hidden="true" />
           Overseer
         </Link>
 
