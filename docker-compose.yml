@@ -57,6 +57,7 @@ services:
       - "5173:80"
     depends_on:
       - backend
+      - pixeldiff
   pixeldiff:
     build:
       context: ./overseer-pixeldiff

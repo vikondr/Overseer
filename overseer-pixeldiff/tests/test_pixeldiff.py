@@ -98,6 +98,36 @@ def test_diff_partial_change_scores_between_identity_and_total_difference(client
     )
 
 
+# ── /diff: colour sensitivity ──────────────────────────────────────────
+
+def test_diff_reports_ssim_and_color_components(client, png_bytes):
+    """The blended score must expose its structural and colour components."""
+    img = png_bytes(size=(64, 64), color=(120, 120, 120))
+
+    payload = client.post("/diff", files=_files(img, img)).json()
+
+    assert payload["ssim"] == pytest.approx(1.0, abs=1e-6)
+    assert payload["color_score"] == pytest.approx(1.0, abs=1e-6)
+    assert payload["score"] == pytest.approx(1.0, abs=1e-6)
+
+
+def test_diff_full_recolour_is_penalised_by_colour_term(client, png_bytes):
+    """
+    A whole-canvas recolour keeps structure intact, so SSIM alone stays high.
+    The colour term must drag the blended score meaningfully below the
+    structural score — this is the fix for SSIM's colour-blindness.
+    """
+    blue = png_bytes(size=(64, 64), color=(40, 90, 220))
+    green = png_bytes(size=(64, 64), color=(40, 200, 90))
+
+    payload = client.post("/diff", files=_files(blue, green)).json()
+
+    # Colour fidelity is clearly hurt, structure is not.
+    assert payload["color_score"] < payload["ssim"]
+    # The blended score sits below the (deceptively high) structural score.
+    assert payload["score"] < payload["ssim"]
+
+
 # ── /diff: dimension mismatch ──────────────────────────────────────────
 
 def test_diff_resizes_image_b_to_match_image_a(client, png_bytes):
