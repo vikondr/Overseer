@@ -1,5 +1,6 @@
 package com.overseer.config;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -65,6 +66,16 @@ public class SecurityConfig {
 
             .oauth2Login(oauth2 -> oauth2
                 .successHandler(oAuth2SuccessHandler)
+            )
+
+            // Return 401 for unauthenticated API calls instead of redirecting to
+            // OAuth2 login. The frontend initiates the OAuth2 flow explicitly via
+            // /oauth2/authorization/google; backend API rejections must be 401 so
+            // clients (and TestRestTemplate in E2E tests) don't follow a redirect
+            // chain to Google's login page.
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint((request, response, authException) ->
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, authException.getMessage()))
             )
 
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
