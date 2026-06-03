@@ -30,9 +30,15 @@ public class User {
 
     private String displayName;
     private String avatarUrl;
+    /** Blob key when the user uploaded a custom avatar. Null = use external {@code avatarUrl}. */
+    private String avatarStorageKey;
 
     @Column(columnDefinition = "TEXT")
     private String bio;
+
+    /** Long-form profile README (markdown). Surfaced on the user's profile page. */
+    @Column(columnDefinition = "TEXT")
+    private String readmeContent;
 
     private String location;
     private String websiteUrl;

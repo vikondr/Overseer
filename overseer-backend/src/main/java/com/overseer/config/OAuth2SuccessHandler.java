@@ -63,7 +63,12 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         return userRepository.findByProviderAndProviderId(provider, providerId)
             .map(existing -> {
-                if (avatarUrl != null) existing.setAvatarUrl(avatarUrl);
+                // Refresh the avatar from the OAuth provider only when the user
+                // hasn't uploaded a custom one — otherwise a re-login would
+                // silently overwrite their chosen profile picture.
+                if (avatarUrl != null && existing.getAvatarStorageKey() == null) {
+                    existing.setAvatarUrl(avatarUrl);
+                }
                 if (name != null) existing.setDisplayName(name);
                 return userRepository.save(existing);
             })

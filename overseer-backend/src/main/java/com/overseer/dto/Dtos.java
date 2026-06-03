@@ -38,6 +38,7 @@ public class Dtos {
         private String displayName;
         private String avatarUrl;
         private String bio;
+        private String readmeContent;
         private String location;
         private String websiteUrl;
         private String portfolioUrl;
@@ -53,9 +54,10 @@ public class Dtos {
         @Pattern(regexp = "^[a-zA-Z0-9_-]{3,30}$",
                  message = "Username must be 3–30 characters and contain only letters, numbers, hyphens, or underscores")
         private String username;
-        @Size(max = 50) private String displayName;
-        @Size(max = 500) private String bio;
-        @Size(max = 100) private String location;
+        @Size(max = 50)    private String displayName;
+        @Size(max = 500)   private String bio;
+        @Size(max = 20000) private String readmeContent;
+        @Size(max = 100)   private String location;
         private String websiteUrl;
         private String portfolioUrl;
         private Set<String> skills;

@@ -72,6 +72,14 @@ public class ProjectController {
         return ResponseEntity.ok(projectService.getUserProjects(username, requesterId));
     }
 
+    @GetMapping("/user/{username}/starred")
+    public ResponseEntity<List<ProjectSummary>> getStarredProjects(
+            @PathVariable String username,
+            @AuthenticationPrincipal User user) {
+        String requesterId = user != null ? user.getId() : null;
+        return ResponseEntity.ok(projectService.getStarredProjects(username, requesterId));
+    }
+
     // ── Explore & Search ────────────────────────────────────
 
     @GetMapping("/explore")

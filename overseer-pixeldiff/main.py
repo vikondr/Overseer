@@ -31,11 +31,48 @@ def load_image(upload: UploadFile) -> Image.Image:
         raise HTTPException(status_code=400, detail=f"Could not read image: {upload.filename}")
 
 
-def resize_to_match(img_a: Image.Image, img_b: Image.Image):
-    """Resize img_b to match img_a dimensions if they differ."""
-    if img_a.size != img_b.size:
-        img_b = img_b.resize(img_a.size, Image.LANCZOS)
-    return img_a, img_b
+def _fit_with_pad(img: Image.Image, box: tuple[int, int]) -> Image.Image:
+    """
+    Scale img to fit inside ``box`` (w, h) preserving its aspect ratio, then
+    pad the remainder so the result is exactly box-sized. Content is anchored
+    top-left to mirror a design canvas origin; padding is white.
+
+    The box is always <= the image in both dimensions (see normalize_pair), so
+    this only ever *downscales* — it never invents interpolation blur by
+    enlarging, and it never stretches, so content is not distorted.
+    """
+    box_w, box_h = box
+    w, h = img.size
+    scale = min(box_w / w, box_h / h)
+    new_w = max(1, round(w * scale))
+    new_h = max(1, round(h * scale))
+    # Skip the resample entirely when the image already fits the box — running
+    # LANCZOS at scale 1.0 is not a no-op (it re-convolves and softens edges),
+    # which would degrade the un-scaled image relative to the scaled one.
+    resized = img if (new_w, new_h) == (w, h) else img.resize((new_w, new_h), Image.LANCZOS)
+    if (new_w, new_h) == (box_w, box_h):
+        return resized
+    canvas = Image.new("RGB", (box_w, box_h), (255, 255, 255))
+    canvas.paste(resized, (0, 0))
+    return canvas
+
+
+def normalize_pair(img_a: Image.Image, img_b: Image.Image):
+    """
+    Bring two images onto a common, comparable canvas before diffing.
+
+    Both are scaled to fit a shared box = (min width, min height) of the two,
+    preserving aspect ratio and padding to that exact size. Because the box is
+    a *symmetric* function of the two sizes, the comparison is order-independent
+    (diff(a, b) == diff(b, a)) — unlike stretching one image onto the other,
+    which made the score depend on which version you picked as "before". Where
+    aspect ratios differ, the unmatched region reads honestly as a difference
+    rather than distorting the whole frame.
+    """
+    if img_a.size == img_b.size:
+        return img_a, img_b
+    box = (min(img_a.width, img_b.width), min(img_a.height, img_b.height))
+    return _fit_with_pad(img_a, box), _fit_with_pad(img_b, box)
 
 
 def color_similarity(arr_a: np.ndarray, arr_b: np.ndarray) -> float:
@@ -118,7 +155,8 @@ async def diff(
     """
     img_a = load_image(image_a)
     img_b = load_image(image_b)
-    img_a, img_b = resize_to_match(img_a, img_b)
+    orig_a, orig_b = img_a.size, img_b.size
+    img_a, img_b = normalize_pair(img_a, img_b)
 
     arr_a = np.asarray(img_a, dtype=np.float32)
     arr_b = np.asarray(img_b, dtype=np.float32)
@@ -157,7 +195,13 @@ async def diff(
         "score": round(score, 6),
         "ssim": round(ssim_score, 6),
         "color_score": round(color_score, 6),
+        # width/height describe the canvas actually compared (and the diff_image
+        # size). original_a/original_b expose each input's true size so a
+        # dimension change is never silently hidden by the normalisation.
         "width": img_a.width,
         "height": img_a.height,
+        "original_a": {"width": orig_a[0], "height": orig_a[1]},
+        "original_b": {"width": orig_b[0], "height": orig_b[1]},
+        "resized": orig_a != orig_b,
         "diff_image": diff_b64,
     }

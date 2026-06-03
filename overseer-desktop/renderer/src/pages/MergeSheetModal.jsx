@@ -338,17 +338,50 @@ function FileRow({ file, kind, last, resolution, onResolve, isDiffOpen, diff, di
                 <span className="font-black tabular-nums" style={{ color: scoreColor(diff.score) }}>
                   {(diff.score * 100).toFixed(2)}%
                 </span>
-                <span className="ml-auto text-slate-600 font-mono">{diff.width}×{diff.height}</span>
+                {diff.resized ? (
+                  <span
+                    className="ml-auto text-slate-600 font-mono text-right"
+                    title={`Inputs differed in size — both scaled onto a shared ${diff.width}×${diff.height} canvas (aspect preserved) before comparing.`}
+                  >
+                    <span className="text-amber-500/80">resized</span>{' '}
+                    {diff.original_a.width}×{diff.original_a.height} vs {diff.original_b.width}×{diff.original_b.height} → {diff.width}×{diff.height}
+                  </span>
+                ) : (
+                  <span className="ml-auto text-slate-600 font-mono">{diff.width}×{diff.height}</span>
+                )}
               </div>
-              <img
-                src={`data:image/png;base64,${diff.diff_image}`}
-                alt="Pixel diff"
-                className="w-full max-h-[40vh] object-contain bg-slate-950"
-              />
+              <div className="flex gap-2 items-stretch p-2">
+                <img
+                  src={`data:image/png;base64,${diff.diff_image}`}
+                  alt="Pixel diff"
+                  className="flex-1 min-w-0 max-h-[40vh] object-contain bg-slate-950 rounded"
+                />
+                <MergeChangeLegend />
+              </div>
             </div>
           ) : null}
         </div>
       )}
+    </div>
+  );
+}
+
+function MergeChangeLegend() {
+  return (
+    <div className="shrink-0 flex flex-col items-center select-none">
+      <div className="flex gap-1.5 flex-1 min-h-[80px]">
+        <div
+          className="w-2.5 rounded-full"
+          style={{
+            // matches build_diff_image palette: pink (major) → violet → blue (minor)
+            background: 'linear-gradient(to bottom, #f472b6 0%, #a78bfa 50%, #60a5fa 100%)',
+          }}
+        />
+        <div className="flex flex-col justify-between text-[9px] text-slate-500 leading-none">
+          <span>Major</span>
+          <span className="text-slate-600">Minor</span>
+        </div>
+      </div>
     </div>
   );
 }

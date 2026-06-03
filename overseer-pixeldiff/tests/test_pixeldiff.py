@@ -130,21 +130,83 @@ def test_diff_full_recolour_is_penalised_by_colour_term(client, png_bytes):
 
 # ── /diff: dimension mismatch ──────────────────────────────────────────
 
-def test_diff_resizes_image_b_to_match_image_a(client, png_bytes):
+def test_diff_normalises_to_the_smaller_common_canvas(client, png_bytes):
     """
-    Mismatched dimensions are reconciled by resizing image_b to image_a's
-    size, not by rejecting the request. The reported width/height reflect
-    image_a after resizing.
+    Mismatched dimensions are reconciled by scaling *both* images onto a shared
+    box = (min width, min height), not by rejecting the request. The reported
+    width/height describe that common canvas (= the diff image size), and the
+    true input sizes are surfaced separately.
     """
     large = png_bytes(size=(200, 100), color=(50, 50, 50))
     small = png_bytes(size=(64, 32),   color=(50, 50, 50))
 
     payload = client.post("/diff", files=_files(large, small)).json()
 
-    assert payload["width"] == 200
-    assert payload["height"] == 100
+    assert payload["width"] == 64
+    assert payload["height"] == 32
+    assert payload["resized"] is True
+    assert payload["original_a"] == {"width": 200, "height": 100}
+    assert payload["original_b"] == {"width": 64, "height": 32}
     # Same colour under resize remains nearly identical perceptually
     assert payload["score"] > 0.95
+
+
+def test_diff_is_symmetric_under_size_mismatch(client):
+    """
+    diff(a, b) must equal diff(b, a). The old "stretch b onto a" logic made the
+    score depend on argument order (the larger image got upscaled, inventing
+    interpolation blur); normalising to a symmetric common canvas fixes that.
+    """
+    from PIL import Image
+
+    # A patterned image so the metric has real structure to (dis)agree on.
+    def patterned(size):
+        img = Image.new("RGB", size, (30, 60, 120))
+        for x in range(size[0] // 2):
+            for y in range(size[1]):
+                img.putpixel((x, y), (220, 200, 40))
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
+
+    big = patterned((180, 120))
+    small = patterned((90, 60))
+
+    forward = client.post("/diff", files=_files(big, small)).json()
+    backward = client.post("/diff", files=_files(small, big)).json()
+
+    assert forward["score"] == pytest.approx(backward["score"], abs=1e-9)
+    assert forward["ssim"] == pytest.approx(backward["ssim"], abs=1e-9)
+    assert forward["color_score"] == pytest.approx(backward["color_score"], abs=1e-9)
+
+
+def test_diff_pure_rescale_scores_near_identity(client):
+    """
+    The same content at a different resolution is not a real change. After
+    normalisation it must score close to 1.0 — the old code dropped well below
+    because upscaling the smaller image blurred it against the sharp original.
+    """
+    from PIL import Image
+
+    base = Image.new("RGB", (100, 80), (40, 120, 90))
+    # Give it edges so SSIM has structure to track through the rescale.
+    for x in range(100):
+        for y in range(40):
+            base.putpixel((x, y), (200, 80, 160))
+
+    def to_png(img):
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
+
+    original = to_png(base)
+    upscaled = to_png(base.resize((300, 240), Image.LANCZOS))  # same content, 3×
+
+    payload = client.post("/diff", files=_files(original, upscaled)).json()
+
+    assert payload["score"] > 0.97, (
+        f"a pure rescale should read as near-identical, got {payload['score']}"
+    )
 
 
 # ── /diff: malformed input ────────────────────────────────────────────

@@ -122,24 +122,71 @@ export default function CompareVersionsModal({ open, onClose, file, sheetId, api
                     <span className="text-xs text-slate-400 font-medium">match</span>
                     <span className="text-[11px] text-slate-500">{scoreLabel}</span>
                   </div>
-                  <span className="ml-auto text-xs text-slate-600">
-                    {result.width}×{result.height}
-                  </span>
+                  <DiffDimensions result={result} />
                 </div>
-                <div className="rounded-xl border border-slate-800/70 overflow-hidden bg-slate-950/40">
-                  <img
-                    src={`data:image/png;base64,${result.diff_image}`}
-                    alt="Highlighted changes between the two versions"
-                    className="w-full max-h-[60vh] object-contain"
-                  />
-                  <p className="px-4 py-2 text-[11px] text-slate-500 border-t border-slate-800/70">
-                    Coloured areas highlight what changed between the two versions.
-                  </p>
+                <div className="flex gap-3 items-stretch">
+                  <div className="flex-1 min-w-0 rounded-xl border border-slate-800/70 overflow-hidden bg-slate-950/40">
+                    <img
+                      src={`data:image/png;base64,${result.diff_image}`}
+                      alt="Highlighted changes between the two versions"
+                      className="w-full max-h-[60vh] object-contain"
+                    />
+                    <p className="px-4 py-2 text-[11px] text-slate-500 border-t border-slate-800/70">
+                      Coloured areas highlight what changed between the two versions.
+                    </p>
+                  </div>
+                  <ChangeLegend />
                 </div>
               </div>
             )}
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function DiffDimensions({ result }) {
+  if (!result.resized) {
+    return (
+      <span className="ml-auto text-xs text-slate-600">
+        {result.width}×{result.height}
+      </span>
+    );
+  }
+  const a = result.original_a;
+  const b = result.original_b;
+  return (
+    <span
+      className="ml-auto text-right text-[11px] text-slate-600 leading-tight"
+      title={`Inputs differed in size — both scaled onto a shared ${result.width}×${result.height} canvas (aspect preserved) before comparing.`}
+    >
+      <span className="text-amber-500/80 font-medium">resized · </span>
+      {a.width}×{a.height} vs {b.width}×{b.height}
+      <br />
+      <span className="text-slate-700">compared at {result.width}×{result.height}</span>
+    </span>
+  );
+}
+
+function ChangeLegend() {
+  return (
+    <div className="shrink-0 flex flex-col items-center py-2 px-1 select-none">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
+        Change
+      </span>
+      <div className="flex gap-2 flex-1 min-h-[120px]">
+        <div
+          className="w-3 rounded-full"
+          style={{
+            // matches build_diff_image palette: pink (major) → violet → blue (minor)
+            background: 'linear-gradient(to bottom, #f472b6 0%, #a78bfa 50%, #60a5fa 100%)',
+          }}
+        />
+        <div className="flex flex-col justify-between text-[10px] text-slate-500 leading-none">
+          <span>Major</span>
+          <span className="text-slate-600">Minor</span>
+        </div>
       </div>
     </div>
   );

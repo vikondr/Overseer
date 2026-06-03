@@ -151,6 +151,31 @@ public class ProjectService {
         return visible.stream().map(this::toSummary).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<ProjectSummary> getStarredProjects(String username, String requesterId) {
+        User user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
+
+        // Mirror the visibility filter from getUserProjects so we never leak a
+        // private project just because someone starred it.
+        boolean self = user.getId().equals(requesterId);
+        List<Project> visible = new ArrayList<>();
+        for (Project p : user.getStarredProjects()) {
+            if (p.getVisibility() == Project.Visibility.PUBLIC) {
+                visible.add(p);
+                continue;
+            }
+            if (requesterId != null && access.roleOf(p, requesterId) != null) {
+                visible.add(p);
+                continue;
+            }
+            if (self) visible.add(p);
+        }
+        // Newest-starred first isn't tracked; fall back to most recently updated.
+        visible.sort((a, b) -> b.getUpdatedAt().compareTo(a.getUpdatedAt()));
+        return visible.stream().map(this::toSummary).collect(Collectors.toList());
+    }
+
     // ── Explore & Search ────────────────────────────────────
 
     public PageResponse<ProjectSummary> exploreProjects(int page, int size, String sortBy) {

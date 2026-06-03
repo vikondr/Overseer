@@ -166,6 +166,53 @@ public class StorageService {
 
     public record DownloadResult(byte[] data, String mimeType, String fileName) {}
 
+    /** Stash a user-uploaded avatar in blob storage and return the storage key. */
+    public String storeAvatar(String userId, MultipartFile file) throws IOException {
+        String original = file.getOriginalFilename() != null ? file.getOriginalFilename() : "avatar";
+        String ext = "";
+        int dot = original.lastIndexOf('.');
+        if (dot > 0 && dot < original.length() - 1) ext = original.substring(dot).toLowerCase();
+        String key = "avatars/" + userId + "/" + UUID.randomUUID() + ext;
+        if ("local".equals(storageType)) {
+            Path target = Paths.get(localPath, key);
+            Files.createDirectories(target.getParent());
+            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+        } else if ("azure".equals(storageType)) {
+            blobContainerClient.getBlobClient(key)
+                .upload(file.getInputStream(), file.getSize(), true);
+        } else {
+            throw new UnsupportedOperationException("Unsupported storage type: " + storageType);
+        }
+        return key;
+    }
+
+    /** Pull raw bytes out of blob storage by key. Used by avatar streaming. */
+    public DownloadResult downloadByKey(String key, String fallbackMime) throws IOException {
+        byte[] data;
+        if ("local".equals(storageType)) {
+            data = Files.readAllBytes(Paths.get(localPath, key));
+        } else if ("azure".equals(storageType)) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            blobContainerClient.getBlobClient(key).downloadStream(out);
+            data = out.toByteArray();
+        } else {
+            throw new UnsupportedOperationException("Unsupported storage type: " + storageType);
+        }
+        String mime = fallbackMime;
+        int dot = key.lastIndexOf('.');
+        if (dot > 0) {
+            switch (key.substring(dot).toLowerCase()) {
+                case ".png"  -> mime = "image/png";
+                case ".jpg", ".jpeg" -> mime = "image/jpeg";
+                case ".webp" -> mime = "image/webp";
+                case ".gif"  -> mime = "image/gif";
+                case ".svg"  -> mime = "image/svg+xml";
+                default -> { /* keep fallback */ }
+            }
+        }
+        return new DownloadResult(data, mime, key.substring(key.lastIndexOf('/') + 1));
+    }
+
     public DownloadResult downloadFile(String fileId) throws IOException {
         ProjectFile pf = fileRepository.findById(fileId)
             .orElseThrow(() -> new ResourceNotFoundException("File not found"));
